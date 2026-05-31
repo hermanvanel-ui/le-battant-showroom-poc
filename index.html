@@ -364,7 +364,8 @@ new RGBELoader().load(
 const concreteTexSet = loadTextureSet('concrete_floor_02', { res:'1k', repeat:[8, 8] });
 const plasterTexSet = loadTextureSet('painted_plaster_wall', { res:'1k', repeat:[4, 2] });
 const woodTexSet = loadTextureSet('worn_planks', { res:'1k', repeat:[3, 3] });
-const metalTexSet = loadTextureSet('metal_plate_02', { res:'1k', repeat:[1, 2] });
+// Texture alu spécifique pour les volets (painted_metal_shutter = alu thermolaqué)
+const aluShutterTex = loadTextureSet('painted_metal_shutter', { res:'1k', repeat:[1, 2] });
 
 // =========================================================
 // MATÉRIAUX
@@ -373,25 +374,33 @@ const MAT = {
   floor: materialFromSet(concreteTexSet, { metalness: 0.0, roughness: 0.9 }),
   wall: materialFromSet(plasterTexSet, { metalness: 0.0, roughness: 1.0 }),
   pedestal: materialFromSet(woodTexSet, { metalness: 0.0, roughness: 0.85 }),
-  // Alu thermolaqué vert-volet (couleur Le battant)
+  // Alu thermolaqué vert-volet (couleur Le battant) — texture painted_metal_shutter tinté
   aluVert: new THREE.MeshPhysicalMaterial({
-    color: 0x8FAF89, metalness: 0.55, roughness: 0.4,
+    color: 0x8FAF89,
+    map: aluShutterTex.diff,
+    normalMap: aluShutterTex.nor_gl,
+    roughnessMap: aluShutterTex.rough,
+    aoMap: aluShutterTex.ao,
+    metalness: 0.6, roughness: 0.35,
     clearcoat: 0.55, clearcoatRoughness: 0.25, envMapIntensity: 1.5
   }),
-  // Alu thermolaqué crème (variantes)
   aluCreme: new THREE.MeshPhysicalMaterial({
-    color: 0xC8C2A8, metalness: 0.5, roughness: 0.42,
-    clearcoat: 0.55, envMapIntensity: 1.5
+    color: 0xC8C2A8,
+    map: aluShutterTex.diff, normalMap: aluShutterTex.nor_gl,
+    roughnessMap: aluShutterTex.rough, aoMap: aluShutterTex.ao,
+    metalness: 0.55, roughness: 0.4, clearcoat: 0.5, envMapIntensity: 1.5
   }),
-  // Alu rouge sang (accent)
   aluRouge: new THREE.MeshPhysicalMaterial({
-    color: 0xC5322D, metalness: 0.6, roughness: 0.38,
-    clearcoat: 0.6, envMapIntensity: 1.6
+    color: 0xC5322D,
+    map: aluShutterTex.diff, normalMap: aluShutterTex.nor_gl,
+    roughnessMap: aluShutterTex.rough, aoMap: aluShutterTex.ao,
+    metalness: 0.65, roughness: 0.34, clearcoat: 0.6, envMapIntensity: 1.6
   }),
-  // Alu noir profond (variantes)
   aluNoir: new THREE.MeshPhysicalMaterial({
-    color: 0x1f1f2a, metalness: 0.7, roughness: 0.35,
-    clearcoat: 0.5, envMapIntensity: 1.4
+    color: 0x1f1f2a,
+    map: aluShutterTex.diff, normalMap: aluShutterTex.nor_gl,
+    roughnessMap: aluShutterTex.rough, aoMap: aluShutterTex.ao,
+    metalness: 0.7, roughness: 0.32, clearcoat: 0.5, envMapIntensity: 1.4
   }),
   // Quincaillerie (paumelles, poignées) — noir brillant
   hardware: new THREE.MeshPhysicalMaterial({
