@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le battant — showroom 3D des 8 volets</title>
+<meta name="description" content="Showroom 3D Le battant : 8 types de volets dans un seul espace, navigation au scroll. Test d'idée de Herman.">
+<style>
+  :root {
+    --noir:#08080c; --noir-2:#14141A; --creme:#F5F0E1;
+    --creme-soft:rgba(245,240,225,0.74); --creme-faint:rgba(245,240,225,0.36);
+    --rouge:#C5322D; --vert-volet:#8FAF89; --vert-deep:#4A6347;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body {
+    background:#050508; color:var(--creme);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  body { overflow-x:hidden; }
+
+  #scene-wrap { position:fixed; inset:0; z-index:0; }
+  #scene-wrap canvas { display:block; width:100%; height:100%; }
+
+  main { position:relative; z-index:2; pointer-events:none; }
+  section { min-height:100vh; display:flex; align-items:center; padding:80px 24px; }
+
+  .hud { position:fixed; z-index:5; pointer-events:none; }
+  .panel { background:rgba(8,8,12,0.78); border:1px solid rgba(245,240,225,0.14); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+
+  #brand { top:24px; left:24px; padding:12px 18px; border-radius:2px; }
+  #brand .b1 { font-size:26px; font-family:'Pacifico',cursive; color:var(--vert-volet); line-height:1; }
+  #brand .b2 { font-size:9px; letter-spacing:0.4em; text-transform:uppercase; color:var(--creme-faint); margin-top:4px; }
+
+  #progress { top:50%; right:24px; transform:translateY(-50%); display:flex; flex-direction:column; gap:10px; padding:14px 10px; border-radius:2px; max-height:80vh; overflow-y:auto; }
+  #progress::-webkit-scrollbar { width:0; }
+  #progress .dot { width:7px; height:7px; border-radius:50%; background:rgba(245,240,225,0.22); transition:background .25s, transform .25s; flex-shrink:0; }
+  #progress .dot.active { background:var(--rouge); transform:scale(1.5); box-shadow:0 0 10px var(--rouge); }
+  #progress .dot.passed { background:var(--creme-soft); }
+
+  #scroll-hint { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:5; pointer-events:none; opacity:1; transition:opacity .4s; text-align:center; }
+  #scroll-hint.gone { opacity:0; }
+  #scroll-hint .arrow { width:1px; height:36px; background:linear-gradient(to bottom, transparent, var(--creme-soft)); margin:0 auto 8px; animation:hint 2.4s ease-in-out infinite; }
+  #scroll-hint .label { font-size:9px; letter-spacing:0.4em; text-transform:uppercase; color:var(--creme-faint); }
+  @keyframes hint { 0%,100% { transform:translateY(0); opacity:0.3; } 50% { transform:translateY(8px); opacity:1; } }
+
+  #loader { position:fixed; inset:0; background:var(--noir); z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:opacity .6s, visibility .6s; }
+  #loader.gone { opacity:0; visibility:hidden; }
+  #loader .lring { width:54px; height:54px; border:2px solid rgba(245,240,225,0.15); border-top-color:var(--rouge); border-radius:50%; animation:spin 1s linear infinite; margin-bottom:20px; }
+  #loader .l-label { font-size:11px; letter-spacing:0.4em; text-transform:uppercase; color:var(--creme-faint); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .container { max-width:540px; margin:0 auto; pointer-events:auto; }
+  .kicker {
+    display:inline-block; font-size:10px; letter-spacing:0.4em; text-transform:uppercase;
+    color:var(--creme-faint); padding:6px 14px; border:1px solid rgba(245,240,225,0.18);
+    border-radius:2px; margin-bottom:18px; background:rgba(8,8,12,0.55); backdrop-filter:blur(8px);
+  }
+  .kicker.accent { color:var(--rouge); border-color:rgba(197,50,45,0.5); }
+  h1 { font-size:clamp(44px, 8vw, 88px); font-weight:800; letter-spacing:-0.02em; line-height:0.95; margin-bottom:18px; }
+  h1 .accent { color:var(--rouge); }
+  h2 { font-size:clamp(32px, 6vw, 60px); font-weight:800; letter-spacing:-0.02em; line-height:1; margin-bottom:14px; }
+  .accent-bar { display:block; width:48px; height:3px; background:var(--rouge); margin:0 0 18px; }
+  .lead { font-size:17px; line-height:1.55; color:var(--creme-soft); max-width:440px; }
+  .lead.center { margin:0 auto; }
+
+  .specs { list-style:none; margin-top:14px; }
+  .specs li { font-size:13px; line-height:1.6; color:var(--creme-soft); padding-left:18px; position:relative; }
+  .specs li::before { content:"›"; position:absolute; left:0; color:var(--rouge); font-weight:bold; }
+
+  section.hero { text-align:center; }
+  section.hero .container { text-align:center; }
+  section.hero .accent-bar { margin-left:auto; margin-right:auto; }
+  section.right .container { margin-left:auto; margin-right:6vw; text-align:right; }
+  section.right .accent-bar { margin-left:auto; margin-right:0; }
+  section.left .container { margin-right:auto; margin-left:6vw; }
+  section.outro { text-align:center; }
+  section.outro .container { text-align:center; }
+  section.outro .accent-bar { margin-left:auto; margin-right:auto; }
+
+  .btn-cta {
+    display:inline-block; margin-top:22px;
+    background:var(--rouge); color:var(--creme);
+    padding:14px 28px; font-size:12px; letter-spacing:0.22em; text-transform:uppercase; font-weight:700;
+    text-decoration:none; border-radius:2px; transition:all .2s; pointer-events:auto;
+    box-shadow:0 4px 22px rgba(197,50,45,0.35);
+  }
+  .btn-cta:hover { background:#a72924; transform:translateY(-2px); box-shadow:0 6px 28px rgba(197,50,45,0.55); }
+
+  footer { text-align:center; padding:30px 24px 22px; font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:var(--creme-faint); }
+  footer a { color:var(--creme-soft); text-decoration:none; border-bottom:1px solid var(--creme-faint); }
+
+  @media (max-width:760px) {
+    #progress { right:12px; padding:10px 6px; gap:8px; }
+    #brand .b1 { font-size:22px; }
+    section.right .container, section.left .container { margin-left:auto; margin-right:auto; text-align:center; }
+    section.right .accent-bar, section.left .accent-bar { margin-left:auto; margin-right:auto; }
+    .lead { text-align:center; margin-left:auto; margin-right:auto; }
+    .specs { display:inline-block; text-align:left; }
+    h1 { font-size:48px; } h2 { font-size:34px; }
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="loader"><div class="lring"></div><div class="l-label">Préparation du showroom</div></div>
+<div id="scene-wrap"></div>
+
+<div id="brand" class="hud panel">
+  <div class="b1">le battant</div>
+  <div class="b2">Showroom 3D · 8 modèles</div>
+</div>
+
+<div id="progress" class="hud panel">
+  <div class="dot active" data-i="0"></div>
+  <div class="dot" data-i="1"></div>
+  <div class="dot" data-i="2"></div>
+  <div class="dot" data-i="3"></div>
+  <div class="dot" data-i="4"></div>
+  <div class="dot" data-i="5"></div>
+  <div class="dot" data-i="6"></div>
+  <div class="dot" data-i="7"></div>
+  <div class="dot" data-i="8"></div>
+  <div class="dot" data-i="9"></div>
+</div>
+
+<div id="scroll-hint"><div class="arrow"></div><div class="label">Scrolle</div></div>
+
+<main>
+  <section class="hero" data-room="0">
+    <div class="container">
+      <span class="kicker accent">Showroom 3D · Test concept</span>
+      <h1>8 volets.<br><span class="accent">Un showroom.</span></h1>
+      <span class="accent-bar"></span>
+      <p class="lead center">Les volets s'ouvrent. Tu rentres. Tu découvres les 8 modèles dans l'espace. Scrolle pour t'avancer.</p>
+    </div>
+  </section>
+
+  <section class="left" data-room="1">
+    <div class="container">
+      <span class="kicker">Modèle 01 / 08</span>
+      <h2>Battant à gond.</h2>
+      <span class="accent-bar"></span>
+      <p class="lead">Le grand classique. Charnières apparentes, ouverture extérieure pleine, robustesse éprouvée.</p>
+      <ul class="specs">
+        <li>Profilé alu 6063 thermolaqué</li>
+        <li>Charnières inox 304 dissimulables</li>
+        <li>Hauteur jusqu'à 3,2 m sur-mesure</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="right" data-room="2">
+    <div class="container">
+      <span class="kicker">Modèle 02 / 08</span>
+      <h2>Battant à dormant.</h2>
+      <span class="accent-bar"></span>
+      <p class="lead">Le battant qui s'encastre. Cadre dormant intégré au tableau, finition affleurante.</p>
+      <ul class="specs">
+        <li>Dormant alu noyé dans la maçonnerie</li>
+        <li>Étanchéité périphérique EPDM</li>
+        <li>Idéal rénovation patrimoine</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="left" data-room="3">
+    <div class="container">
+      <span class="kicker">Modèle 03 / 08</span>
+      <h2>Pliant.</h2>
+      <span class="accent-bar"></span>
+      <p class="lead">L'accordéon. 4 vantaux articulés qui se replient sur le côté pour libérer totalement la baie.</p>
+      <ul class="specs">
+        <li>Vantaux 50 cm × 4 pliés sur 1 côté</li>
+        <li>Roulement à billes sur rail bas</li>
+        <li>Grande largeur jusqu'à 4 m d'un seul tenant</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="right" data-room="4">
+    <div class="container">
+      <span class="kicker">Modèle 04 / 08</span>
+      <h2>Pliant suspendu.</h2>
+      <span class="accent-bar"></span>
+      <p class="lead">Le pliant sans rail au sol. Tout est en suspension sur un rail haut, pas d'obstacle au passage.</p>
+      <ul class="specs">
+        <li>Rail haut renforcé acier galvanisé</li>
+        <li>Aucun seuil = accessibilité PMR</li>
+        <li>Charge max 80 kg/vantail</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="left" data-room="5">
+    <div class="container">
+      <span class="kicker">Modèle 05 / 08</span>
+      <h2>Coulissant suspendu.</h2>
+      <span class="accent-bar"></span>
+      <p class="lead">Comme une porte de grange, mais alu thermolaqué. Le vantail glisse en façade, sans débord.</p>
+      <ul class="specs">
+        <li>Glissière laiton anti-corrosion</li>
+        <li>Vantaux superposables 2 ou 3 voies</li>
+        <li>Finition cache-rail magnétique</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="right" data-room="6">
+    <div class="container">
+      <span class="kicker">Modèle 06 / 08</span>
+      <h2>Brise-vue.</h2>
+      <span class="accent-bar"></span>
+      <p class="lead">Lamelles fixes inclinées 45°. Bloque la vue depuis l'extérieur, laisse passer la lumière et l'air.</p>
+      <ul class="specs">
+        <li>Lamelles plates 60 mm pas de 30 mm</li>
+        <li>Cadre périphérique soudé</li>
+        <li>Ventilation passive constante</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="left" data-room="7">
+    <div class="container">
+      <span class="kicker">Modèle 07 / 08</span>
+      <h2>Brise-soleil.</h2>
+      <span class="accent-bar"></span>
+      <p class="lead">Lamelles orientables à la corde. Module la lumière selon la saison, gère le solaire.</p>
+      <ul class="specs">
+        <li>Lamelles inclinables 0° à 90°</li>
+        <li>Commande corde inox ou électrique</li>
+        <li>Façade sud / véranda / pergola</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="right" data-room="8">
+    <div class="container">
+      <span class="kicker">Modèle 08 / 08</span>
+      <h2>Séparatif balcon.</h2>
+      <span class="accent-bar"></span>
+      <p class="lead">Panneau pleine hauteur. Coupe la vue entre balcons voisins, conforme R+2 PMR.</p>
+      <ul class="specs">
+        <li>Panneau plein opaque 2 m</li>
+        <li>Fixation sol + plafond renforcée</li>
+        <li>Résistance vent ≥ 120 km/h</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="outro">
+    <div class="container">
+      <span class="kicker accent">Et tout ce qui suit.</span>
+      <h2>Lequel pour vous ?</h2>
+      <span class="accent-bar"></span>
+      <p class="lead center">8 modèles, une équipe au Cannet. Envoyez vos cotes, on cale ensemble.</p>
+      <a href="#" class="btn-cta">Demander un devis →</a>
+    </div>
+  </section>
+
+  <footer>POC showroom Le battant · Three.js + Bloom + Polyhaven PBR · <a href="https://github.com/hermanvanel-ui/le-battant-showroom-poc" target="_blank" rel="noopener">code GitHub</a></footer>
+</main>
+
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.166.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.166.1/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// =========================================================
+// PBR LIBRARY HELPERS (inline, sans dépendre du CDN)
+// =========================================================
+const PBR_CDN = 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/{res}/{name}/{name}_{map}_{res}.jpg';
+const HDRI_CDN = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/{res}/{name}_{res}.hdr';
+
+function loadTextureSet(name, opts = {}) {
+  const { res = '1k', maps = ['diff', 'nor_gl', 'rough', 'ao'], repeat = [1, 1] } = opts;
+  const loader = new THREE.TextureLoader();
+  const result = {};
+  for (const map of maps) {
+    const url = PBR_CDN.replaceAll('{res}', res).replaceAll('{name}', name).replaceAll('{map}', map);
+    const tex = loader.load(url);
+    tex.colorSpace = (map === 'diff') ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repeat[0], repeat[1]);
+    result[map] = tex;
+  }
+  return result;
+}
+
+function materialFromSet(textures, options = {}) {
+  return new THREE.MeshPhysicalMaterial({
+    map: textures.diff,
+    normalMap: textures.nor_gl,
+    roughnessMap: textures.rough,
+    aoMap: textures.ao,
+    metalness: 0.0,
+    roughness: 1.0,
+    envMapIntensity: 1.0,
+    ...options
+  });
+}
+
+// =========================================================
+// SCENE / RENDERER / COMPOSER
+// =========================================================
+const wrap = document.getElementById('scene-wrap');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05050a);
+scene.fog = new THREE.FogExp2(0x05050a, 0.025);
+
+const camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 200);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+wrap.appendChild(renderer.domElement);
+
+const renderPass = new RenderPass(scene, camera);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.4, 0.5, 0.8);
+const outputPass = new OutputPass();
+const composer = new EffectComposer(renderer);
+composer.addPass(renderPass); composer.addPass(bloomPass); composer.addPass(outputPass);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+
+// =========================================================
+// HDRI (industrial sunset pour atelier showroom)
+// =========================================================
+new RGBELoader().load(
+  HDRI_CDN.replaceAll('{res}', '1k').replaceAll('{name}', 'industrial_sunset_02'),
+  (hdri) => { hdri.mapping = THREE.EquirectangularReflectionMapping; scene.environment = hdri; }
+);
+
+// =========================================================
+// PBR TEXTURES — Polyhaven (chargées en parallèle)
+// =========================================================
+const concreteTexSet = loadTextureSet('concrete_floor_02', { res:'1k', repeat:[8, 8] });
+const plasterTexSet = loadTextureSet('painted_plaster_wall', { res:'1k', repeat:[4, 2] });
+const woodTexSet = loadTextureSet('worn_planks', { res:'1k', repeat:[3, 3] });
+const metalTexSet = loadTextureSet('metal_plate_02', { res:'1k', repeat:[1, 2] });
+
+// =========================================================
+// MATÉRIAUX
+// =========================================================
+const MAT = {
+  floor: materialFromSet(concreteTexSet, { metalness: 0.0, roughness: 0.9 }),
+  wall: materialFromSet(plasterTexSet, { metalness: 0.0, roughness: 1.0 }),
+  pedestal: materialFromSet(woodTexSet, { metalness: 0.0, roughness: 0.85 }),
+  // Alu thermolaqué vert-volet (couleur Le battant)
+  aluVert: new THREE.MeshPhysicalMaterial({
+    color: 0x8FAF89, metalness: 0.55, roughness: 0.4,
+    clearcoat: 0.55, clearcoatRoughness: 0.25, envMapIntensity: 1.5
+  }),
+  // Alu thermolaqué crème (variantes)
+  aluCreme: new THREE.MeshPhysicalMaterial({
+    color: 0xC8C2A8, metalness: 0.5, roughness: 0.42,
+    clearcoat: 0.55, envMapIntensity: 1.5
+  }),
+  // Alu rouge sang (accent)
+  aluRouge: new THREE.MeshPhysicalMaterial({
+    color: 0xC5322D, metalness: 0.6, roughness: 0.38,
+    clearcoat: 0.6, envMapIntensity: 1.6
+  }),
+  // Alu noir profond (variantes)
+  aluNoir: new THREE.MeshPhysicalMaterial({
+    color: 0x1f1f2a, metalness: 0.7, roughness: 0.35,
+    clearcoat: 0.5, envMapIntensity: 1.4
+  }),
+  // Quincaillerie (paumelles, poignées) — noir brillant
+  hardware: new THREE.MeshPhysicalMaterial({
+    color: 0x14141A, metalness: 0.9, roughness: 0.22,
+    clearcoat: 0.7, envMapIntensity: 1.7
+  }),
+};
+
+function castAll(g) { g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }}); return g; }
+function fixAO(mesh) {
+  if (mesh.geometry && mesh.geometry.attributes.uv && !mesh.geometry.attributes.uv2) {
+    mesh.geometry.setAttribute('uv2', mesh.geometry.attributes.uv);
+  }
+}
+
+// =========================================================
+// SHOWROOM ARCHITECTURE
+// 20m × 14m, plafond ouvert avec beams, sol béton, murs plâtre
+// =========================================================
+const SR = { halfW: 10, halfL: 7, wallH: 4.0, wallT: 0.18 };
+
+// Sol béton ciré
+const floor = new THREE.Mesh(new THREE.BoxGeometry(SR.halfW*2, 0.1, SR.halfL*2), MAT.floor);
+floor.position.y = -0.05; floor.receiveShadow = true; fixAO(floor); scene.add(floor);
+
+// Murs (4 outer)
+function makeWall(w, h, d, x, y, z) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), MAT.wall);
+  m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; fixAO(m);
+  return m;
+}
+scene.add(makeWall(SR.halfW*2, SR.wallH, SR.wallT, 0, SR.wallH/2, -SR.halfL)); // nord (back)
+scene.add(makeWall(SR.halfW*2, SR.wallH, SR.wallT, 0, SR.wallH/2,  SR.halfL)); // sud (front, mais on entre dedans → cf. plus bas)
+scene.add(makeWall(SR.wallT, SR.wallH, SR.halfL*2, -SR.halfW, SR.wallH/2, 0));
+scene.add(makeWall(SR.wallT, SR.wallH, SR.halfL*2,  SR.halfW, SR.wallH/2, 0));
+
+// Plinthe noire au sol contour
+const plinthMat = new THREE.MeshStandardMaterial({ color:0x14141A, roughness:0.7 });
+[
+  [SR.halfW*2, 0.1, SR.wallT*1.3, 0, 0.05, -SR.halfL + 0.05],
+  [SR.halfW*2, 0.1, SR.wallT*1.3, 0, 0.05,  SR.halfL - 0.05],
+  [SR.wallT*1.3, 0.1, SR.halfL*2, -SR.halfW + 0.05, 0.05, 0],
+  [SR.wallT*1.3, 0.1, SR.halfL*2,  SR.halfW - 0.05, 0.05, 0],
+].forEach(([w,h,d,x,y,z]) => {
+  const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), plinthMat);
+  p.position.set(x, y, z); scene.add(p);
+});
+
+// Plafond avec beams + spots LED
+const ceilMat = new THREE.MeshStandardMaterial({ color:0x14141A, roughness:0.9 });
+for (let i = -2; i <= 2; i++) {
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(SR.halfW*2 - 0.4, 0.15, 0.22), ceilMat);
+  beam.position.set(0, SR.wallH - 0.08, i * 2.8);
+  beam.castShadow = true;
+  scene.add(beam);
+}
+
+// Spots dans le plafond (4 spots ciblant chaque volet)
+function makeSpot(x, z, targetX, targetY, targetZ, color = 0xFFEEC0, intensity = 12) {
+  const s = new THREE.SpotLight(color, intensity, 8, Math.PI/4.5, 0.55, 1.5);
+  s.position.set(x, SR.wallH - 0.2, z);
+  s.castShadow = true;
+  s.shadow.mapSize.set(1024, 1024);
+  s.shadow.bias = -0.0001;
+  const t = new THREE.Object3D();
+  t.position.set(targetX, targetY, targetZ);
+  scene.add(t);
+  s.target = t;
+  scene.add(s);
+  // Petit visu (le boitier)
+  const housing = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.08, 0.08, 16),
+    new THREE.MeshStandardMaterial({ color:0x14141A, roughness:0.4, metalness:0.6 })
+  );
+  housing.position.set(x, SR.wallH - 0.12, z);
+  scene.add(housing);
+  return s;
+}
+
+// Ambient + key very low (HDRI fait l'essentiel)
+scene.add(new THREE.AmbientLight(0xF5F0E1, 0.08));
+
+// =========================================================
+// VOLET FACTORIES — 4 types unique geometries
+// =========================================================
+
+// Petit cadre / poignée commune
+function addHandle(g, x, z = 0.04, color = MAT.hardware) {
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.04, 20, 12), color);
+  knob.position.set(x, 0, z);
+  g.add(knob);
+}
+
+// === 1) BATTANT (2 panneaux articulés sur charnières) ===
+function makeBattantPanel(aluMat, isLeft = true) {
+  const g = new THREE.Group();
+  const w = 0.6, h = 1.9, d = 0.04, fw = 0.05;
+  // Cadre
+  const top = new THREE.Mesh(new THREE.BoxGeometry(w, fw, d), aluMat);
+  top.position.set(0, h/2 - fw/2, 0); g.add(top);
+  const bottom = top.clone(); bottom.position.y = -h/2 + fw/2; g.add(bottom);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(fw, h - fw*2, d), aluMat);
+  left.position.set(-w/2 + fw/2, 0, 0); g.add(left);
+  const right = left.clone(); right.position.x = w/2 - fw/2; g.add(right);
+  // Lamelles
+  const nLouvres = 12;
+  const louvreH = (h - fw*2 - 0.04) / nLouvres;
+  for (let i = 0; i < nLouvres; i++) {
+    const louvre = new THREE.Mesh(new THREE.BoxGeometry(w - fw*2 - 0.01, louvreH * 0.85, d * 0.85), aluMat);
+    louvre.position.set(0, -h/2 + fw + louvreH/2 + 0.02 + i * louvreH, 0.005);
+    louvre.rotation.x = -0.18;
+    g.add(louvre);
+  }
+  // Paumelles
+  const hingeX = isLeft ? -w/2 + fw/2 : w/2 - fw/2;
+  for (let i = 0; i < 3; i++) {
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.1, 12), MAT.hardware);
+    cyl.rotation.z = Math.PI/2;
+    cyl.position.set(hingeX, h/2 - fw - 0.18 - i * 0.7, d/2 + 0.01);
+    g.add(cyl);
+  }
+  addHandle(g, isLeft ? w/2 - fw - 0.08 : -w/2 + fw + 0.08);
+  return castAll(g);
+}
+
+function makeBattant(aluMat, openAngle = 0.6) {
+  const g = new THREE.Group();
+  // Pivots gauche et droite
+  const W = 0.6;
+  const leftPanel = makeBattantPanel(aluMat, true);
+  const leftPivot = new THREE.Group();
+  leftPivot.position.set(-W, 0, 0);
+  leftPanel.position.x = W/2;
+  leftPivot.add(leftPanel);
+  leftPivot.rotation.y = -openAngle;
+  g.add(leftPivot);
+
+  const rightPanel = makeBattantPanel(aluMat, false);
+  const rightPivot = new THREE.Group();
+  rightPivot.position.set(W, 0, 0);
+  rightPanel.position.x = -W/2;
+  rightPivot.add(rightPanel);
+  rightPivot.rotation.y = openAngle;
+  g.add(rightPivot);
+
+  return g;
+}
+
+// === 2) PLIANT (4 panneaux articulés en accordéon) ===
+function makePliant(aluMat) {
+  const g = new THREE.Group();
+  const W = 0.32, H = 1.9;
+  const nPanels = 4;
+  let prevPivot = null;
+  let currentPos = new THREE.Vector3(-W * 1.5, 0, 0);
+  const foldAngle = 0.7;
+
+  for (let i = 0; i < nPanels; i++) {
+    const panel = makeBattantPanel(aluMat, i % 2 === 0);
+    panel.scale.x = W / 0.6;  // ajuste à la largeur W
+    const pivot = new THREE.Group();
+    pivot.position.copy(currentPos);
+    panel.position.x = W/2;
+    pivot.add(panel);
+    pivot.rotation.y = (i % 2 === 0) ? -foldAngle : foldAngle;
+    g.add(pivot);
+    // calcule la prochaine position au bout du panneau (orientation appliquée)
+    currentPos.x += W * Math.cos((i % 2 === 0) ? -foldAngle : foldAngle);
+    currentPos.z += W * Math.sin((i % 2 === 0) ? -foldAngle : foldAngle);
+  }
+  return g;
+}
+
+// === 3) COULISSANT (2 panneaux décalés latéralement) ===
+function makeCoulissant(aluMat) {
+  const g = new THREE.Group();
+  const W = 0.7, H = 1.9;
+  const p1 = makeBattantPanel(aluMat, true); p1.position.set(-W/2 - 0.05, 0, 0);
+  const p2 = makeBattantPanel(aluMat, false); p2.position.set(W/2 + 0.05, 0, 0.04);
+  g.add(p1); g.add(p2);
+  // Rail haut (suspension)
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(W * 3, 0.06, 0.08), MAT.hardware);
+  rail.position.set(0, H/2 + 0.06, 0);
+  g.add(rail);
+  // Suspentes
+  for (const x of [-W * 0.6, W * 0.6]) {
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 8), MAT.hardware);
+    stem.position.set(x, H/2 + 0.02, 0);
+    g.add(stem);
+  }
+  return castAll(g);
+}
+
+// === 4) BRISE-SOLEIL / BRISE-VUE (cadre + lamelles inclinées orientables) ===
+function makeBriseSoleil(aluMat, louvreAngle = -0.7) {
+  const g = new THREE.Group();
+  const W = 1.0, H = 1.9, fw = 0.04, d = 0.03;
+  // Cadre
+  const top = new THREE.Mesh(new THREE.BoxGeometry(W, fw, d), aluMat);
+  top.position.set(0, H/2 - fw/2, 0); g.add(top);
+  const bottom = top.clone(); bottom.position.y = -H/2 + fw/2; g.add(bottom);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(fw, H, d), aluMat);
+  left.position.set(-W/2 + fw/2, 0, 0); g.add(left);
+  const right = left.clone(); right.position.x = W/2 - fw/2; g.add(right);
+  // Lamelles obliques (12)
+  const nLouvres = 14;
+  const louvreH = (H - fw*2) / nLouvres;
+  for (let i = 0; i < nLouvres; i++) {
+    const louvre = new THREE.Mesh(new THREE.BoxGeometry(W - fw*2 - 0.01, louvreH * 0.65, d * 1.8), aluMat);
+    louvre.position.set(0, -H/2 + fw + louvreH/2 + i * louvreH, 0);
+    louvre.rotation.x = louvreAngle;
+    g.add(louvre);
+  }
+  return castAll(g);
+}
+
+// === 5) SÉPARATIF BALCON (panneau plein) ===
+function makeSeparatif(aluMat) {
+  const g = new THREE.Group();
+  const W = 1.1, H = 2.0;
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.05), aluMat);
+  g.add(panel);
+  // Cadre périphérique noir
+  const fw = 0.05;
+  const top = new THREE.Mesh(new THREE.BoxGeometry(W + fw*2, fw, 0.06), MAT.hardware);
+  top.position.set(0, H/2 + fw/2, 0); g.add(top);
+  const bottom = top.clone(); bottom.position.y = -H/2 - fw/2; g.add(bottom);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(fw, H + fw*2, 0.06), MAT.hardware);
+  left.position.set(-W/2 - fw/2, 0, 0); g.add(left);
+  const right = left.clone(); right.position.x = W/2 + fw/2; g.add(right);
+  return castAll(g);
+}
+
+// =========================================================
+// PIÉDESTAUX + ÉTIQUETTE
+// =========================================================
+function makePedestal(label, color = 0x8FAF89) {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 0.7), MAT.pedestal);
+  base.position.y = 0.25; fixAO(base); g.add(base);
+  // Plinthe accent rouge
+  const accent = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.02, 0.65),
+    new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.35 }));
+  accent.position.y = 0.51;
+  g.add(accent);
+  // Étiquette texte
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 96;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0)';
+  ctx.fillRect(0, 0, 512, 96);
+  ctx.fillStyle = '#F5F0E1';
+  ctx.font = 'bold 42px system-ui';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, 256, 48);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sprite.scale.set(1.8, 0.35, 1);
+  sprite.position.set(0, 0.7, 0.36);
+  g.add(sprite);
+  return castAll(g);
+}
+
+// =========================================================
+// PLACER LES 8 VOLETS DANS LE SHOWROOM
+// Layout : 4 contre le mur nord (z=-5.5), 4 contre le mur sud (z=+5.5)
+// =========================================================
+const VOLETS = [
+  // Nord
+  { id: 0, name: '01 Battant à gond',       pos: [-7, 0.6, -5.2], factory: () => makeBattant(MAT.aluVert, 0.55), spotColor: 0xFFD8A8 },
+  { id: 1, name: '02 Battant à dormant',    pos: [-2.4, 0.6, -5.2], factory: () => makeBattant(MAT.aluCreme, 0.4), spotColor: 0xFFE8C0 },
+  { id: 2, name: '03 Pliant',               pos: [ 2.4, 0.6, -5.2], factory: () => makePliant(MAT.aluVert), spotColor: 0xCFE6FF },
+  { id: 3, name: '04 Pliant suspendu',      pos: [ 7, 0.6, -5.2], factory: () => makePliant(MAT.aluNoir), spotColor: 0xFFCFB6 },
+  // Sud
+  { id: 4, name: '05 Coulissant suspendu',  pos: [-7, 0.6,  5.2], factory: () => makeCoulissant(MAT.aluVert), spotColor: 0xFFE8C0 },
+  { id: 5, name: '06 Brise-vue',            pos: [-2.4, 0.6,  5.2], factory: () => makeBriseSoleil(MAT.aluCreme, -1.0), spotColor: 0xFFD8A8 },
+  { id: 6, name: '07 Brise-soleil',         pos: [ 2.4, 0.6,  5.2], factory: () => makeBriseSoleil(MAT.aluVert, -0.4), spotColor: 0xFFE8C0 },
+  { id: 7, name: '08 Séparatif balcon',     pos: [ 7, 0.6,  5.2], factory: () => makeSeparatif(MAT.aluRouge), spotColor: 0xFFCFCF },
+];
+
+VOLETS.forEach(v => {
+  // Piédestal
+  const ped = makePedestal(v.name, v.id < 4 ? 0x8FAF89 : 0xC5322D);
+  ped.position.set(v.pos[0], 0, v.pos[2]);
+  ped.rotation.y = v.pos[2] < 0 ? Math.PI : 0;  // faces vers le centre
+  scene.add(ped);
+  // Volet sur piédestal
+  const volet = v.factory();
+  volet.position.set(v.pos[0], v.pos[1] + 0.65, v.pos[2] + (v.pos[2] < 0 ? 0.25 : -0.25));
+  // Orienter vers le centre du showroom
+  volet.rotation.y = v.pos[2] < 0 ? 0 : Math.PI;
+  scene.add(volet);
+
+  // Spot dédié au volet
+  makeSpot(v.pos[0], v.pos[2] + (v.pos[2] < 0 ? 1.5 : -1.5), v.pos[0], 1.3, v.pos[2], v.spotColor, 14);
+});
+
+// =========================================================
+// HERO VOLET (à l'entrée, façade sud du showroom)
+// Position devant la porte d'entrée — caméra démarre dehors
+// =========================================================
+const heroVolet = new THREE.Group();
+const heroLeft = makeBattantPanel(MAT.aluVert, true);
+const heroLeftPivot = new THREE.Group();
+heroLeftPivot.position.set(-0.6, 0, 0);
+heroLeft.position.x = 0.3;
+heroLeftPivot.add(heroLeft);
+heroVolet.add(heroLeftPivot);
+const heroRight = makeBattantPanel(MAT.aluVert, false);
+const heroRightPivot = new THREE.Group();
+heroRightPivot.position.set(0.6, 0, 0);
+heroRight.position.x = -0.3;
+heroRightPivot.add(heroRight);
+heroVolet.add(heroRightPivot);
+heroVolet.position.set(0, 1.05, SR.halfL + 0.1);  // devant le mur sud
+heroVolet.scale.setScalar(1.4);
+scene.add(heroVolet);
+
+// Petit emissive derrière les volets (lumière qui sort)
+const heroGlow = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.8, 2.2),
+  new THREE.MeshStandardMaterial({ color:0xFFAA66, emissive:0xFFAA66, emissiveIntensity:0.35, side:THREE.DoubleSide })
+);
+heroGlow.position.set(0, 1.4, SR.halfL + 0.18);
+scene.add(heroGlow);
+
+// =========================================================
+// CAMERA PATH — 10 waypoints
+// 0: outside (hero face-on)
+// 1: hero opening (volet ouvre, caméra à 4m)
+// 2: entered, looking down the showroom (z=5)
+// 3-10: each volet
+// 11: outro
+// =========================================================
+const WP = [
+  { p:[0, 2.5, 14],         l:[0, 1.4, 7] },          // 0 — extérieur sud, regard sur le hero
+  { p:[0, 1.65, 10],        l:[0, 1.5, 7] },          // 1 — devant la porte d'entrée
+  { p:[0, 1.65, 7.5],       l:[0, 1.5, 5] },          // 2 — vient juste d'entrer
+  // 3 → 10 : passer devant chaque volet (sud puis ouest puis nord puis est-ish)
+  { p:[ 7, 1.65,  3.5],     l:[ 7, 1.3,  5.0] },      // 3 — devant V4 coulissant (sud-est)
+  { p:[-7, 1.65,  3.5],     l:[-7, 1.3,  5.0] },      // 4 — devant V5 brise-vue (sud-ouest)
+  { p:[-2.4, 1.65,  3.0],   l:[-2.4, 1.3,  5.0] },    // 5 — devant V6 brise-soleil
+  { p:[ 2.4, 1.65,  3.0],   l:[ 2.4, 1.3,  5.0] },    // 6 — devant V7 (oups doublon, ajustons)
+  { p:[ 7, 1.65, -3.5],     l:[ 7, 1.3, -5.0] },      // 7 — V3 pliant suspendu (nord-est)
+  { p:[ 2.4, 1.65, -3.0],   l:[ 2.4, 1.3, -5.0] },    // 8 — V2 pliant
+  { p:[-2.4, 1.65, -3.0],   l:[-2.4, 1.3, -5.0] },    // 9 — V1 battant dormant
+  { p:[-7, 1.65, -3.5],     l:[-7, 1.3, -5.0] },      // 10 — V0 battant à gond
+  { p:[0, 4.5, -2],         l:[0, 1.0, 0] },          // 11 — outro overview
+];
+
+const posCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.5);
+const lookCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.5);
+
+// =========================================================
+// SCROLL + LENIS
+// =========================================================
+let scrollT = 0, targetT = 0;
+function updateScrollT() {
+  const max = document.documentElement.scrollHeight - innerHeight;
+  targetT = Math.max(0, Math.min(1, scrollY / Math.max(1, max)));
+}
+const lenis = (typeof Lenis === 'function' && !prefersReduced)
+  ? new Lenis({ duration: 1.6, easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)), smoothWheel: true, smoothTouch: false })
+  : null;
+if (lenis) {
+  lenis.on('scroll', updateScrollT);
+  (function raf(t) { lenis.raf(t); requestAnimationFrame(raf); })();
+} else {
+  addEventListener('scroll', updateScrollT, { passive:true });
+}
+updateScrollT();
+
+// HUD
+const dots = [...document.querySelectorAll('#progress .dot')];
+const hint = document.getElementById('scroll-hint');
+function updateHUD() {
+  const idx = Math.min(9, Math.round(scrollT * 10));
+  dots.forEach((d, i) => {
+    d.classList.toggle('active', i === idx);
+    d.classList.toggle('passed', i < idx);
+  });
+  hint.classList.toggle('gone', scrollT > 0.03);
+}
+dots.forEach((d, i) => {
+  d.style.pointerEvents = 'auto'; d.style.cursor = 'pointer';
+  d.addEventListener('click', () => {
+    document.querySelectorAll('main > section')[i]?.scrollIntoView({ behavior:'smooth', block:'start' });
+  });
+});
+
+// =========================================================
+// LOOP — anime hero volets + caméra
+// =========================================================
+const clock = new THREE.Clock();
+const lookV = new THREE.Vector3();
+function easeInOutCubic(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
+
+function loop() {
+  const dt = clock.getDelta();
+
+  scrollT += (targetT - scrollT) * 0.045;
+  const t = Math.max(0, Math.min(1, scrollT));
+
+  // Hero volets — ouverture entre t=0.0 et t=0.15
+  const openT = Math.max(0, Math.min(1, t / 0.15));
+  const openEased = easeInOutCubic(openT);
+  heroLeftPivot.rotation.y = -openEased * Math.PI * 0.6;
+  heroRightPivot.rotation.y = openEased * Math.PI * 0.6;
+  heroGlow.material.emissiveIntensity = 0.35 + openEased * 0.5;
+
+  // Caméra suit le path
+  const tC = Math.max(0, Math.min(1, t));
+  camera.position.copy(posCurve.getPointAt(tC));
+  lookV.copy(lookCurve.getPointAt(tC));
+  camera.lookAt(lookV);
+
+  updateHUD();
+  composer.render();
+  requestAnimationFrame(loop);
+}
+loop();
+
+setTimeout(() => document.getElementById('loader').classList.add('gone'), 2200);
+</script>
+</body>
+</html>
