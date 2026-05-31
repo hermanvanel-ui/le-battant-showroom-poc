@@ -669,34 +669,140 @@ function makePedestal(label, color = 0x8FAF89) {
 // PLACER LES 8 VOLETS DANS LE SHOWROOM
 // Layout : 4 contre le mur nord (z=-5.5), 4 contre le mur sud (z=+5.5)
 // =========================================================
+// =========================================================
+// MUSEUM DISPLAY BOARDS — placeholder canvas avec silhouette
+// (sera remplacé par les vraies images Gemini quand uploadées dans refs/)
+// =========================================================
+function makeBoardTexture(label, kicker, color) {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 1500;
+  const ctx = c.getContext('2d');
+
+  // Background : crème dégradé (style catalogue d'art)
+  const g = ctx.createLinearGradient(0, 0, 0, 1500);
+  g.addColorStop(0, '#F5F0E1');
+  g.addColorStop(1, '#EAE5D6');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 1024, 1500);
+
+  // Silhouette volet (rectangle teinté + lamelles)
+  const hex = color.toString(16).padStart(6, '0');
+  const r = parseInt(hex.slice(0,2),16), g_ = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+  ctx.fillStyle = `rgba(${r},${g_},${b},0.13)`;
+  ctx.fillRect(180, 280, 664, 900);
+  ctx.strokeStyle = `rgba(${r},${g_},${b},0.85)`;
+  ctx.lineWidth = 6;
+  ctx.strokeRect(180, 280, 664, 900);
+
+  // 12 lamelles horizontales
+  ctx.strokeStyle = `rgba(${r},${g_},${b},0.55)`;
+  ctx.lineWidth = 3;
+  for (let i = 1; i < 12; i++) {
+    const y = 280 + i * 75;
+    ctx.beginPath();
+    ctx.moveTo(210, y);
+    ctx.lineTo(814, y);
+    ctx.stroke();
+  }
+  // Division centrale (suggère 2 panneaux)
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(512, 280);
+  ctx.lineTo(512, 1180);
+  ctx.stroke();
+
+  // Kicker top
+  ctx.fillStyle = '#5a5a5a';
+  ctx.font = 'bold 28px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(kicker.toUpperCase(), 512, 130);
+
+  // Titre principal
+  ctx.fillStyle = '#0d0d12';
+  ctx.font = 'bold 64px system-ui, sans-serif';
+  ctx.fillText(label, 512, 220);
+
+  // Sous-titre bas
+  ctx.fillStyle = '#888';
+  ctx.font = '28px system-ui, sans-serif';
+  ctx.fillText('Visuel en cours de production', 512, 1260);
+  ctx.font = 'italic 22px system-ui, sans-serif';
+  ctx.fillText('Image Gemini à intégrer', 512, 1300);
+
+  // Bande accent en bas
+  ctx.fillStyle = `#${hex}`;
+  ctx.fillRect(180, 1380, 664, 10);
+
+  // "le battant" signature
+  ctx.fillStyle = '#8FAF89';
+  ctx.font = 'italic 38px "Pacifico", cursive';
+  ctx.fillText('le battant', 512, 1450);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeDisplayBoard(label, kicker, color) {
+  const g = new THREE.Group();
+  const W = 1.5, H = 2.2, D = 0.04;
+
+  // Canvas (toile imprimée)
+  const tex = makeBoardTexture(label, kicker, color);
+  const canvas = new THREE.Mesh(
+    new THREE.BoxGeometry(W, H, D),
+    new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0.0 })
+  );
+  g.add(canvas);
+
+  // Cadre noir mat autour (style galerie d'art)
+  const fw = 0.07;
+  const fT = D + 0.025;
+  const top = new THREE.Mesh(new THREE.BoxGeometry(W + fw*2, fw, fT), MAT.hardware);
+  top.position.y = H/2 + fw/2; g.add(top);
+  const bot = top.clone(); bot.position.y = -H/2 - fw/2; g.add(bot);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(fw, H, fT), MAT.hardware);
+  left.position.x = -W/2 - fw/2; g.add(left);
+  const right = left.clone(); right.position.x = W/2 + fw/2; g.add(right);
+
+  // Plaquette dorée en bas (étiquette musée)
+  const plate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, 0.08, 0.01),
+    new THREE.MeshPhysicalMaterial({ color: 0xc9a268, metalness: 0.85, roughness: 0.35, clearcoat: 0.6 })
+  );
+  plate.position.set(0, -H/2 - fw - 0.06, fT/2 + 0.005);
+  g.add(plate);
+
+  return castAll(g);
+}
+
 const VOLETS = [
   // Nord
-  { id: 0, name: '01 Battant à gond',       pos: [-7, 0.6, -5.2], factory: () => makeBattant(MAT.aluVert, 0.55), spotColor: 0xFFD8A8 },
-  { id: 1, name: '02 Battant à dormant',    pos: [-2.4, 0.6, -5.2], factory: () => makeBattant(MAT.aluCreme, 0.4), spotColor: 0xFFE8C0 },
-  { id: 2, name: '03 Pliant',               pos: [ 2.4, 0.6, -5.2], factory: () => makePliant(MAT.aluVert), spotColor: 0xCFE6FF },
-  { id: 3, name: '04 Pliant suspendu',      pos: [ 7, 0.6, -5.2], factory: () => makePliant(MAT.aluNoir), spotColor: 0xFFCFB6 },
+  { id: 0, name: 'Battant à gond',      kicker: '01 / 08', pos: [-7, 0.6, -5.2], color: 0x8FAF89, factory: () => makeBattant(MAT.aluVert, 0.55), spotColor: 0xFFD8A8 },
+  { id: 1, name: 'Battant à dormant',   kicker: '02 / 08', pos: [-2.4, 0.6, -5.2], color: 0xC8C2A8, factory: () => makeBattant(MAT.aluCreme, 0.4), spotColor: 0xFFE8C0 },
+  { id: 2, name: 'Pliant',              kicker: '03 / 08', pos: [ 2.4, 0.6, -5.2], color: 0x8FAF89, factory: () => makePliant(MAT.aluVert), spotColor: 0xCFE6FF },
+  { id: 3, name: 'Pliant suspendu',     kicker: '04 / 08', pos: [ 7, 0.6, -5.2], color: 0x1f1f2a, factory: () => makePliant(MAT.aluNoir), spotColor: 0xFFCFB6 },
   // Sud
-  { id: 4, name: '05 Coulissant suspendu',  pos: [-7, 0.6,  5.2], factory: () => makeCoulissant(MAT.aluVert), spotColor: 0xFFE8C0 },
-  { id: 5, name: '06 Brise-vue',            pos: [-2.4, 0.6,  5.2], factory: () => makeBriseSoleil(MAT.aluCreme, -1.0), spotColor: 0xFFD8A8 },
-  { id: 6, name: '07 Brise-soleil',         pos: [ 2.4, 0.6,  5.2], factory: () => makeBriseSoleil(MAT.aluVert, -0.4), spotColor: 0xFFE8C0 },
-  { id: 7, name: '08 Séparatif balcon',     pos: [ 7, 0.6,  5.2], factory: () => makeSeparatif(MAT.aluRouge), spotColor: 0xFFCFCF },
+  { id: 4, name: 'Coulissant suspendu', kicker: '05 / 08', pos: [-7, 0.6,  5.2], color: 0x8FAF89, factory: () => makeCoulissant(MAT.aluVert), spotColor: 0xFFE8C0 },
+  { id: 5, name: 'Brise-vue',           kicker: '06 / 08', pos: [-2.4, 0.6,  5.2], color: 0xC8C2A8, factory: () => makeBriseSoleil(MAT.aluCreme, -1.0), spotColor: 0xFFD8A8 },
+  { id: 6, name: 'Brise-soleil',        kicker: '07 / 08', pos: [ 2.4, 0.6,  5.2], color: 0x8FAF89, factory: () => makeBriseSoleil(MAT.aluVert, -0.4), spotColor: 0xFFE8C0 },
+  { id: 7, name: 'Séparatif balcon',    kicker: '08 / 08', pos: [ 7, 0.6,  5.2], color: 0xC5322D, factory: () => makeSeparatif(MAT.aluRouge), spotColor: 0xFFCFCF },
 ];
 
 VOLETS.forEach(v => {
   // Piédestal
-  const ped = makePedestal(v.name, v.id < 4 ? 0x8FAF89 : 0xC5322D);
+  const ped = makePedestal(`${v.kicker.split(' / ')[0]} ${v.name}`, v.id < 4 ? 0x8FAF89 : 0xC5322D);
   ped.position.set(v.pos[0], 0, v.pos[2]);
-  ped.rotation.y = v.pos[2] < 0 ? Math.PI : 0;  // faces vers le centre
+  ped.rotation.y = v.pos[2] < 0 ? Math.PI : 0;
   scene.add(ped);
-  // Volet sur piédestal
-  const volet = v.factory();
-  volet.position.set(v.pos[0], v.pos[1] + 0.65, v.pos[2] + (v.pos[2] < 0 ? 0.25 : -0.25));
-  // Orienter vers le centre du showroom
-  volet.rotation.y = v.pos[2] < 0 ? 0 : Math.PI;
-  scene.add(volet);
 
-  // Spot dédié au volet
-  makeSpot(v.pos[0], v.pos[2] + (v.pos[2] < 0 ? 1.5 : -1.5), v.pos[0], 1.3, v.pos[2], v.spotColor, 14);
+  // PANNEAU D'EXPOSITION (au lieu du modèle 3D procédural)
+  const board = makeDisplayBoard(v.name, v.kicker, v.color);
+  board.position.set(v.pos[0], 1.65, v.pos[2] + (v.pos[2] < 0 ? 0.15 : -0.15));
+  board.rotation.y = v.pos[2] < 0 ? 0 : Math.PI;
+  scene.add(board);
+
+  // Spot dédié focalisé sur le panneau
+  makeSpot(v.pos[0], v.pos[2] + (v.pos[2] < 0 ? 2.0 : -2.0), v.pos[0], 1.8, v.pos[2], v.spotColor, 18);
 });
 
 // =========================================================
