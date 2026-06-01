@@ -1067,6 +1067,135 @@ function makeBoardTexture(label, kicker, color) {
   return tex;
 }
 
+// =========================================================
+// VOLET EN CONDITION DE POSE — mur fragment + ouverture + volet monté + image ref
+// (retour Herman v0.8 : "modélisation du volet en condition de pose, image à côté")
+// =========================================================
+function makeVoletEnPose(aluMat, imageUrl) {
+  const g = new THREE.Group();
+
+  // Layout horizontal compact : volet à gauche, image à droite, tout sur le même mur
+  const WF_W = 2.6, WF_H = 2.6, WF_D = 0.35;
+  const VOLET_X = -0.65;  // Centre de l'ouverture+volet (gauche)
+  const IMG_X = +0.78;    // Centre de l'image de réf (droite)
+
+  // --- 1. Mur fragment (pierre claire, tonalité Gemini ref NB) ---
+  const stoneWallMat = new THREE.MeshPhysicalMaterial({
+    map: plasterTexSet.diff, normalMap: plasterTexSet.nor_gl, aoMap: plasterTexSet.ao,
+    color: 0xA89E8C, roughness: 1.0, metalness: 0.0
+  });
+  const wallSlab = new THREE.Mesh(new THREE.BoxGeometry(WF_W, WF_H, WF_D), stoneWallMat);
+  wallSlab.position.set(0, WF_H/2, 0);
+  fixAO(wallSlab);
+  g.add(wallSlab);
+
+  // --- 2. Ouverture (fenêtre derrière volet, recessed, glow chaud) ---
+  const WIN_W = 1.2, WIN_H = 1.85;
+  const winCenterY = WF_H/2 - 0.05;  // légèrement décalé vers le bas
+  const winRecess = new THREE.Mesh(
+    new THREE.BoxGeometry(WIN_W, WIN_H, 0.18),
+    new THREE.MeshStandardMaterial({ color: 0x14141A, emissive: 0xFFCC88, emissiveIntensity: 0.55, roughness: 0.5 })
+  );
+  winRecess.position.set(VOLET_X, winCenterY, WF_D/2 - 0.09);
+  g.add(winRecess);
+
+  // Jambage alu noir autour de l'ouverture
+  const jambT = 0.05, jambD = 0.18;
+  const jambTop = new THREE.Mesh(new THREE.BoxGeometry(WIN_W + jambT*2, jambT, jambD), MAT.steelBlack);
+  jambTop.position.set(VOLET_X, winCenterY + WIN_H/2 + jambT/2, WF_D/2 - jambD/2 + 0.06);
+  g.add(jambTop);
+  const jambBot = jambTop.clone();
+  jambBot.position.y = winCenterY - WIN_H/2 - jambT/2;
+  g.add(jambBot);
+  const jambLeft = new THREE.Mesh(new THREE.BoxGeometry(jambT, WIN_H + jambT*2, jambD), MAT.steelBlack);
+  jambLeft.position.set(VOLET_X - WIN_W/2 - jambT/2, winCenterY, WF_D/2 - jambD/2 + 0.06);
+  g.add(jambLeft);
+  const jambRight = jambLeft.clone();
+  jambRight.position.x = VOLET_X + WIN_W/2 + jambT/2;
+  g.add(jambRight);
+
+  // Light interne (ouverture lumineuse)
+  const winLight = new THREE.PointLight(0xFFCC88, 2.5, 2.8, 1.5);
+  winLight.position.set(VOLET_X, winCenterY, WF_D/2 - 0.4);
+  g.add(winLight);
+
+  // --- 3. Volet battant 2 panneaux ouvert ~60° sur paumelles ---
+  const battant = makeBattant(aluMat, 1.0);
+  battant.position.set(VOLET_X, winCenterY, WF_D/2 + 0.06);
+  g.add(battant);
+
+  // Paumelles visibles aux gonds extérieurs (pivots à x=±W=±0.6 dans le frame local de battant)
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 12), MAT.steelBlack);
+      hinge.rotation.z = Math.PI/2;
+      hinge.position.set(VOLET_X + side * 0.6, winCenterY - 0.7 + i * 0.6, WF_D/2 + 0.05);
+      g.add(hinge);
+    }
+  }
+
+  // --- 4. Image de référence Gemini, SUR le mur, côté droit ---
+  if (imageUrl) {
+    const IMG_W = 0.95, IMG_H = 1.25, IMG_D = 0.025;
+    const imgTex = sharedTexLoader.load(imageUrl);
+    imgTex.colorSpace = THREE.SRGBColorSpace;
+    imgTex.anisotropy = 8;
+    const imgPanel = new THREE.Mesh(
+      new THREE.BoxGeometry(IMG_W, IMG_H, IMG_D),
+      new THREE.MeshStandardMaterial({ map: imgTex, roughness: 0.55, metalness: 0.0 })
+    );
+    const imgY = 1.55;
+    imgPanel.position.set(IMG_X, imgY, WF_D/2 + IMG_D/2 + 0.005);
+    g.add(imgPanel);
+
+    // Cadre noir mat autour
+    const fw = 0.04, fT = IMG_D + 0.025;
+    const ftop = new THREE.Mesh(new THREE.BoxGeometry(IMG_W + fw*2, fw, fT), MAT.steelBlack);
+    ftop.position.set(IMG_X, imgY + IMG_H/2 + fw/2, WF_D/2 + fT/2);
+    g.add(ftop);
+    const fbot = ftop.clone();
+    fbot.position.y = imgY - IMG_H/2 - fw/2;
+    g.add(fbot);
+    const fleft = new THREE.Mesh(new THREE.BoxGeometry(fw, IMG_H, fT), MAT.steelBlack);
+    fleft.position.set(IMG_X - IMG_W/2 - fw/2, imgY, WF_D/2 + fT/2);
+    g.add(fleft);
+    const fright = fleft.clone();
+    fright.position.x = IMG_X + IMG_W/2 + fw/2;
+    g.add(fright);
+
+    // Plaque dorée musée
+    const plate = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 0.08, 0.012),
+      new THREE.MeshPhysicalMaterial({ color: 0xc9a268, metalness: 0.85, roughness: 0.35, clearcoat: 0.6 })
+    );
+    plate.position.set(IMG_X, imgY - IMG_H/2 - fw - 0.08, WF_D/2 + fT/2 + 0.006);
+    g.add(plate);
+
+    // Petit kicker rouge "RÉFÉRENCE" au-dessus
+    const rc = document.createElement('canvas'); rc.width = 256; rc.height = 32;
+    const rctx = rc.getContext('2d');
+    rctx.fillStyle = '#C5322D'; rctx.font = 'bold 17px system-ui';
+    rctx.textAlign = 'center'; rctx.textBaseline = 'middle';
+    rctx.fillText('RÉFÉRENCE PHOTO', 128, 16);
+    const refTex = new THREE.CanvasTexture(rc);
+    refTex.colorSpace = THREE.SRGBColorSpace;
+    const refSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: refTex, transparent: true }));
+    refSprite.scale.set(0.6, 0.075, 1);
+    refSprite.position.set(IMG_X, imgY + IMG_H/2 + fw + 0.1, WF_D/2 + fT/2 + 0.02);
+    g.add(refSprite);
+  }
+
+  // Socle béton sous le mur (continuité avec le sol carrelage)
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(WF_W + 0.3, 0.12, WF_D + 0.3),
+    new THREE.MeshPhysicalMaterial({ color: 0x14141A, roughness: 0.65, metalness: 0.2, clearcoat: 0.2 })
+  );
+  base.position.set(0, 0.06, 0);
+  g.add(base);
+
+  return castAll(g);
+}
+
 function makeDisplayBoard(label, kicker, color, imageUrl) {
   const g = new THREE.Group();
   const W = 1.5, H = 2.2, D = 0.04;
@@ -1142,11 +1271,24 @@ VOLETS.forEach((v, i) => {
   ped.rotation.y = v.pos[2] < 0 ? Math.PI : 0;
   scene.add(ped);
 
-  // PANNEAU D'EXPOSITION (image Gemini si v.image fourni, sinon placeholder canvas)
-  const board = makeDisplayBoard(v.name, v.kicker, v.color, v.image);
-  board.position.set(v.pos[0], 1.65, v.pos[2] + (v.pos[2] < 0 ? 0.15 : -0.15));
-  board.rotation.y = v.pos[2] < 0 ? 0 : Math.PI;
-  scene.add(board);
+  // Installation : si v.image fourni → vraie 3D EN CONDITION DE POSE (mur + ouverture + volet monté + image ref à côté)
+  // Sinon → board placeholder classique
+  let exhibit;
+  if (v.image) {
+    const aluMat = v.color === 0x8FAF89 ? MAT.aluVert :
+                   v.color === 0xC8C2A8 ? MAT.aluCreme :
+                   v.color === 0xC5322D ? MAT.aluRouge :
+                   MAT.aluNoir;
+    exhibit = makeVoletEnPose(aluMat, v.image);
+    // Position : mur fragment au même z que le board ancien (caméra reste à distance correcte ~3m)
+    exhibit.position.set(v.pos[0], 0, v.pos[2] + (v.pos[2] < 0 ? 0.15 : -0.15));
+    exhibit.rotation.y = v.pos[2] < 0 ? 0 : Math.PI;
+  } else {
+    exhibit = makeDisplayBoard(v.name, v.kicker, v.color, null);
+    exhibit.position.set(v.pos[0], 1.65, v.pos[2] + (v.pos[2] < 0 ? 0.15 : -0.15));
+    exhibit.rotation.y = v.pos[2] < 0 ? 0 : Math.PI;
+  }
+  scene.add(exhibit);
 
   // Spot dédié focalisé sur le panneau
   makeSpot(v.pos[0], v.pos[2] + (v.pos[2] < 0 ? 2.0 : -2.0), v.pos[0], 1.8, v.pos[2], v.spotColor, 18);
@@ -1157,8 +1299,12 @@ VOLETS.forEach((v, i) => {
   div.className = 'volet-pin';
   div.innerHTML = `<div class="pin-kicker">${t.kicker}</div><div class="pin-title">${t.title}</div><div class="pin-spec">${t.spec}</div>`;
   document.body.appendChild(div);
-  // Ancrage en 3D : à droite (+x) et légèrement plus bas que le centre du board
-  const anchor = new THREE.Vector3(v.pos[0] + 1.1, 1.1, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2));
+  // Ancrage en 3D :
+  // - Si v.image (vraie 3D en pose, image à droite) : pin sous l'image (évite chevauchement)
+  // - Sinon : pin standard à droite à hauteur 1.1m
+  const anchor = v.image
+    ? new THREE.Vector3(v.pos[0] + 1.5, 0.35, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2))
+    : new THREE.Vector3(v.pos[0] + 1.1, 1.1, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2));
   PINS.push({ div, anchor });
 });
 
