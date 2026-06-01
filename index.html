@@ -407,9 +407,10 @@ scene.background = new THREE.Color(0xC4B89A);
 // Fog atmosphérique léger (visible surtout dans le showroom intérieur, donne de la profondeur)
 scene.fog = new THREE.FogExp2(0x9E9070, 0.012);
 
-// FOV dynamique : portrait (mobile) → 65° pour voir plus large sans cramer le plafond ; landscape → 46°
-// Compromis : horizontal visible 32° (vs 22° à 46°) + vertical 65° (vs ceiling à 72°+)
-function computeFOV() { return (innerHeight > innerWidth) ? 65 : 46; }
+// FOV dynamique : portrait 75° → fit le V0 en condition de pose en entier (2.18m wide à 3m)
+// retour Herman v0.13 : "on voit pas en entier le premier volet"
+// Calcul : à FOV 75° portrait (aspect 0.46), horizontal visible 38.8° → 2.15m à 3.05m ✓
+function computeFOV() { return (innerHeight > innerWidth) ? 75 : 46; }
 const camera = new THREE.PerspectiveCamera(computeFOV(), innerWidth/innerHeight, 0.1, 300);
 
 const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
