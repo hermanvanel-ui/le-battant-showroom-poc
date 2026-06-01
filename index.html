@@ -1360,9 +1360,11 @@ VOLETS.forEach((v, i) => {
   div.className = 'volet-pin';
   div.innerHTML = `<div class="pin-kicker">${t.kicker}</div><div class="pin-title">${t.title}</div><div class="pin-spec">${t.spec}</div>`;
   document.body.appendChild(div);
-  // Ancrage en 3D : SOUS le board, centré horizontalement
-  // Marche desktop ET mobile, pas de chevauchement avec image/board, pas d'off-screen en portrait
-  const anchor = new THREE.Vector3(v.pos[0], 0.5, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2));
+  // Ancrage en 3D : SOUS le volet/board, centré horizontalement par rapport à ce que la camera regarde
+  // V0 (avec image en pose) : pin centré sous le VOLET (x-0.45 du centre exhibit), pas sous l'image
+  // Autres : pin centré sous le board (v.pos[0])
+  const pinX = v.image ? v.pos[0] - 0.45 : v.pos[0];
+  const anchor = new THREE.Vector3(pinX, 0.5, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2));
   PINS.push({ div, anchor });
 });
 
@@ -1451,12 +1453,15 @@ const HERO_WP = [
   { p:[0, 2.0, 9.5],        l:[0, 1.85, 6] },         // 1 — on s'approche
   { p:[0, 1.65, 5.5],       l:[0, 1.55, 1.5] },       // 2 — passe la porte (mur sud à z=7 traversé à x∈[0, +0.5] ✓ dans door [-1.5, 1.5])
   // HERO[3] = TOUR[0] (V0 NW) → continuité parfaite à scrollT=0.1 (pos ET look identiques)
-  { p:[-7, 1.65, -1.8],     l:[-7, 1.65, -5.05] },    // 3 — arrive à V0 (= TOUR[0])
+  // ⚠ Centré sur le VOLET (world x=-7.45), pas sur le centre de l'exhibit (x=-7)
+  // car volet local x=-0.45 dans exhibit. Image sur la droite à world x=-6.40.
+  { p:[-7.45, 1.65, -1.8],  l:[-7.45, 1.65, -5.05] }, // 3 — arrive à V0 (= TOUR[0])
 ];
 
 const TOUR_WP = [
   // ─── Mur NORD (z=-5.2) ouest → est ───
-  { p:[-7, 1.65, -1.8],     l:[-7, 1.65, -5.05] },    // 0 → s1 V0 Battant à gond (NW)
+  // V0 centré sur le VOLET (world x=-7.45), pas sur l'exhibit (x=-7). Image visible à droite.
+  { p:[-7.45, 1.65, -1.8],  l:[-7.45, 1.65, -5.05] }, // 0 → s1 V0 Battant à gond (NW)
   { p:[-2.4, 1.65, -1.8],   l:[-2.4, 1.65, -5.05] },  // 1 → s2 V1 Battant à dormant
   { p:[ 2.4, 1.65, -1.8],   l:[ 2.4, 1.65, -5.05] },  // 2 → s3 V2 Pliant
   { p:[ 7, 1.65, -1.8],     l:[ 7, 1.65, -5.05] },    // 3 → s4 V3 Pliant suspendu (NE)
