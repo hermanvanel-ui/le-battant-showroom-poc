@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Le battant — showroom 3D des 8 volets</title>
-<meta name="description" content="Showroom 3D Le battant : 8 types de volets dans un seul espace, navigation au scroll. Test d'idée de Herman.">
+<title>Le battant — showroom 3D des 8 volets (v0.3)</title>
+<meta name="description" content="Showroom 3D Le battant : façade industrielle, on entre par un volet battant, 8 modèles dans un showroom premium (sol carrelage beige, plafond noir nervuré, colonnes IPN, cloisons vitrées). Test d'idée de Herman.">
 <style>
   :root {
     --noir:#08080c; --noir-2:#14141A; --creme:#F5F0E1;
@@ -48,6 +48,7 @@
   #loader.gone { opacity:0; visibility:hidden; }
   #loader .lring { width:54px; height:54px; border:2px solid rgba(245,240,225,0.15); border-top-color:var(--rouge); border-radius:50%; animation:spin 1s linear infinite; margin-bottom:20px; }
   #loader .l-label { font-size:11px; letter-spacing:0.4em; text-transform:uppercase; color:var(--creme-faint); }
+  #loader .l-progress { font-size:10px; letter-spacing:0.3em; color:var(--creme-faint); margin-top:8px; opacity:0.55; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
   .container { max-width:540px; margin:0 auto; pointer-events:auto; }
@@ -106,7 +107,7 @@
 </head>
 <body>
 
-<div id="loader"><div class="lring"></div><div class="l-label">Préparation du showroom</div></div>
+<div id="loader"><div class="lring"></div><div class="l-label">Préparation du showroom</div><div class="l-progress" id="l-progress">Chargement des textures…</div></div>
 <div id="scene-wrap"></div>
 
 <div id="brand" class="hud panel">
@@ -125,6 +126,7 @@
   <div class="dot" data-i="7"></div>
   <div class="dot" data-i="8"></div>
   <div class="dot" data-i="9"></div>
+  <div class="dot" data-i="10"></div>
 </div>
 
 <div id="scroll-hint"><div class="arrow"></div><div class="label">Scrolle</div></div>
@@ -132,14 +134,23 @@
 <main>
   <section class="hero" data-room="0">
     <div class="container">
-      <span class="kicker accent">Showroom 3D · Test concept</span>
+      <span class="kicker accent">Showroom 3D · Le battant</span>
       <h1>8 volets.<br><span class="accent">Un showroom.</span></h1>
       <span class="accent-bar"></span>
-      <p class="lead center">Les volets s'ouvrent. Tu rentres. Tu découvres les 8 modèles dans l'espace. Scrolle pour t'avancer.</p>
+      <p class="lead center">Bienvenue dans l'atelier-showroom Le battant. Scrolle pour t'avancer : le volet d'entrée s'ouvre, tu rentres, et tu visites les 8 modèles dans leurs conditions de pose.</p>
     </div>
   </section>
 
-  <section class="left" data-room="1">
+  <section class="hero" data-room="1">
+    <div class="container">
+      <span class="kicker">Entrée · Le volet ouvre la porte</span>
+      <h2>Pousse la porte.<br><span style="color:var(--rouge)">Au sens propre.</span></h2>
+      <span class="accent-bar"></span>
+      <p class="lead center">Notre porte d'entrée n'est pas une porte. C'est un volet battant. Démonstration vivante de ce qu'on fabrique. Scrolle, ça s'ouvre.</p>
+    </div>
+  </section>
+
+  <section class="left" data-room="2">
     <div class="container">
       <span class="kicker">Modèle 01 / 08</span>
       <h2>Battant à gond.</h2>
@@ -279,29 +290,53 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // =========================================================
-// PBR LIBRARY HELPERS (inline, sans dépendre du CDN)
+// PBR LIBRARY HELPERS — préchargement via THREE.LoadingManager
+// (le manager gère le suivi global ; les textures sont attachées
+// synchroneusement aux matériaux, leurs pixels arrivent en async)
 // =========================================================
 const PBR_CDN = 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/{res}/{name}/{name}_{map}_{res}.jpg';
 const HDRI_CDN = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/{res}/{name}_{res}.hdr';
 
+const lProg = document.getElementById('l-progress');
+const manager = new THREE.LoadingManager();
+manager.onProgress = (url, loaded, total) => {
+  if (lProg) lProg.textContent = `Chargement ${loaded} / ${total}…`;
+};
+manager.onError = (url) => { console.warn('LoadingManager fail:', url); };
+const ALL_LOADED = new Promise(resolve => { manager.onLoad = () => resolve(); });
+
+const sharedTexLoader = new THREE.TextureLoader(manager);
+const sharedRGBELoader = new RGBELoader(manager);
+
 function loadTextureSet(name, opts = {}) {
   const { res = '1k', maps = ['diff', 'nor_gl', 'rough', 'ao'], repeat = [1, 1] } = opts;
-  const loader = new THREE.TextureLoader();
   const result = {};
   for (const map of maps) {
     const url = PBR_CDN.replaceAll('{res}', res).replaceAll('{name}', name).replaceAll('{map}', map);
-    const tex = loader.load(url);
+    const tex = sharedTexLoader.load(url);
     tex.colorSpace = (map === 'diff') ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(repeat[0], repeat[1]);
+    tex.anisotropy = 8;
     result[map] = tex;
   }
   return result;
+}
+
+function loadHDRI(name, res = '1k') {
+  const url = HDRI_CDN.replaceAll('{res}', res).replaceAll('{name}', name);
+  return new Promise((resolve) => {
+    sharedRGBELoader.load(url, (hdri) => {
+      hdri.mapping = THREE.EquirectangularReflectionMapping;
+      resolve(hdri);
+    });
+  });
 }
 
 function materialFromSet(textures, options = {}) {
@@ -322,48 +357,74 @@ function materialFromSet(textures, options = {}) {
 // =========================================================
 const wrap = document.getElementById('scene-wrap');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x05050a);
-scene.fog = new THREE.FogExp2(0x05050a, 0.025);
+// Couleur de fond crème chaud (sera remplacée par HDRI sky pour la background une fois chargé)
+scene.background = new THREE.Color(0xC4B89A);
+// Fog atmosphérique léger (visible surtout dans le showroom intérieur, donne de la profondeur)
+scene.fog = new THREE.FogExp2(0x9E9070, 0.012);
 
-const camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 200);
+const camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 300);
 
-const renderer = new THREE.WebGLRenderer({ antialias:true });
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.05;
 wrap.appendChild(renderer.domElement);
 
 const renderPass = new RenderPass(scene, camera);
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.4, 0.5, 0.8);
+// SSAO subtil pour donner du contact aux objets (recoins, joints, intersections)
+const ssaoPass = new SSAOPass(scene, camera, innerWidth, innerHeight);
+ssaoPass.kernelRadius = 0.32;
+ssaoPass.minDistance = 0.001;
+ssaoPass.maxDistance = 0.08;
+ssaoPass.output = SSAOPass.OUTPUT.Default;
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.35, 0.55, 0.82);
 const outputPass = new OutputPass();
 const composer = new EffectComposer(renderer);
-composer.addPass(renderPass); composer.addPass(bloomPass); composer.addPass(outputPass);
+composer.addPass(renderPass);
+composer.addPass(ssaoPass);
+composer.addPass(bloomPass);
+composer.addPass(outputPass);
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   composer.setSize(innerWidth, innerHeight);
+  ssaoPass.setSize(innerWidth, innerHeight);
 });
 
 // =========================================================
-// HDRI (industrial sunset pour atelier showroom)
+// HDRI (industrial sunset — sera utilisé partout, suffisant)
+// Promise — résolu avant de cacher le loader
 // =========================================================
-new RGBELoader().load(
-  HDRI_CDN.replaceAll('{res}', '1k').replaceAll('{name}', 'industrial_sunset_02'),
-  (hdri) => { hdri.mapping = THREE.EquirectangularReflectionMapping; scene.environment = hdri; }
-);
+const hdriPromise = loadHDRI('industrial_sunset_02', '1k').then(hdri => {
+  if (hdri) {
+    scene.environment = hdri;
+    scene.background = hdri;  // ciel visible quand caméra est dehors
+    scene.backgroundIntensity = 0.85;
+    scene.environmentIntensity = 1.1;
+  }
+  return hdri;
+});
 
 // =========================================================
 // PBR TEXTURES — Polyhaven (chargées en parallèle)
+// Upgrade v0.3 : carrelage beige grand format (sol intérieur),
+// asphalte (sol extérieur), bardage métal (façade), painted_metal_shutter (volets)
 // =========================================================
-const concreteTexSet = loadTextureSet('concrete_floor_02', { res:'1k', repeat:[8, 8] });
-const plasterTexSet = loadTextureSet('painted_plaster_wall', { res:'1k', repeat:[4, 2] });
-const woodTexSet = loadTextureSet('worn_planks', { res:'1k', repeat:[3, 3] });
+// Sol intérieur — carrelage grand format effet pierre beige (style showroom PAAL)
+const tileTexSet = loadTextureSet('large_terrazzo_floor', { res:'1k', repeat:[3, 3] });
+// Murs intérieurs blancs cassés
+const plasterTexSet = loadTextureSet('painted_plaster_wall', { res:'1k', repeat:[3, 1.5] });
+// Sol extérieur asphalte
+const asphaltTexSet = loadTextureSet('asphalt_03', { res:'1k', repeat:[6, 4] });
+// Façade bardage métallique nervuré (anthracite — comme Monsieur Store)
+// `corrugated_iron_03` Polyhaven existe (rusted) — on tint en anthracite via le color du material
+const claddingTexSet = loadTextureSet('corrugated_iron_03', { res:'1k', repeat:[3, 1.8] });
 // Texture alu spécifique pour les volets (painted_metal_shutter = alu thermolaqué)
 const aluShutterTex = loadTextureSet('painted_metal_shutter', { res:'1k', repeat:[1, 2] });
 
@@ -371,9 +432,26 @@ const aluShutterTex = loadTextureSet('painted_metal_shutter', { res:'1k', repeat
 // MATÉRIAUX
 // =========================================================
 const MAT = {
-  floor: materialFromSet(concreteTexSet, { metalness: 0.0, roughness: 0.9 }),
-  wall: materialFromSet(plasterTexSet, { metalness: 0.0, roughness: 1.0 }),
-  pedestal: materialFromSet(woodTexSet, { metalness: 0.0, roughness: 0.85 }),
+  // Sol carrelage grand format beige (ton showroom PAAL)
+  floor: materialFromSet(tileTexSet, { metalness: 0.05, roughness: 0.55, clearcoat: 0.15, clearcoatRoughness: 0.45 }),
+  // Murs blancs cassés (cloisons sobres)
+  wall: materialFromSet(plasterTexSet, { metalness: 0.0, roughness: 0.95 }),
+  // Sol extérieur asphalte (parking devant le bâtiment)
+  asphalt: materialFromSet(asphaltTexSet, { metalness: 0.0, roughness: 0.95 }),
+  // Bardage façade (anthracite nervuré vertical)
+  cladding: materialFromSet(claddingTexSet, { metalness: 0.6, roughness: 0.55, color: 0x2A2D31 }),
+  // IPN / structure / paumelles : noir mat métallique
+  steelBlack: new THREE.MeshPhysicalMaterial({ color: 0x14141A, metalness: 0.7, roughness: 0.45, clearcoat: 0.2 }),
+  // Plafond bac acier noir nervuré
+  ceiling: new THREE.MeshPhysicalMaterial({ color: 0x0E0E12, metalness: 0.55, roughness: 0.7 }),
+  // Verre cloisons vitrées (showroom — chaque volet dans un mini-box vitré)
+  glass: new THREE.MeshPhysicalMaterial({
+    color: 0xFFFFFF, metalness: 0.0, roughness: 0.05,
+    transmission: 0.92, ior: 1.45, thickness: 0.02,
+    clearcoat: 1.0, transparent: true, opacity: 0.18, side: THREE.DoubleSide
+  }),
+  // Pas de pedestal bois — remplacé par socle béton noir
+  pedestal: new THREE.MeshPhysicalMaterial({ color: 0x1B1B22, metalness: 0.2, roughness: 0.6, clearcoat: 0.3 }),
   // Alu thermolaqué vert-volet (couleur Le battant) — texture painted_metal_shutter tinté
   aluVert: new THREE.MeshPhysicalMaterial({
     color: 0x8FAF89,
@@ -417,28 +495,18 @@ function fixAO(mesh) {
 }
 
 // =========================================================
-// SHOWROOM ARCHITECTURE
-// 20m × 14m, plafond ouvert avec beams, sol béton, murs plâtre
+// SHOWROOM ARCHITECTURE v0.3 — ambiance PAAL premium
+// Intérieur 20m × 14m, sol carrelage beige, plafond bac acier noir nervuré,
+// 6 colonnes IPN noires apparentes, murs blancs sobres
 // =========================================================
-const SR = { halfW: 10, halfL: 7, wallH: 4.0, wallT: 0.18 };
+const SR = { halfW: 10, halfL: 7, wallH: 4.2, wallT: 0.18 };
 
-// Sol béton ciré
+// ──── SOL INTÉRIEUR : carrelage grand format beige ────
 const floor = new THREE.Mesh(new THREE.BoxGeometry(SR.halfW*2, 0.1, SR.halfL*2), MAT.floor);
 floor.position.y = -0.05; floor.receiveShadow = true; fixAO(floor); scene.add(floor);
 
-// Murs (4 outer)
-function makeWall(w, h, d, x, y, z) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), MAT.wall);
-  m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; fixAO(m);
-  return m;
-}
-scene.add(makeWall(SR.halfW*2, SR.wallH, SR.wallT, 0, SR.wallH/2, -SR.halfL)); // nord (back)
-scene.add(makeWall(SR.halfW*2, SR.wallH, SR.wallT, 0, SR.wallH/2,  SR.halfL)); // sud (front, mais on entre dedans → cf. plus bas)
-scene.add(makeWall(SR.wallT, SR.wallH, SR.halfL*2, -SR.halfW, SR.wallH/2, 0));
-scene.add(makeWall(SR.wallT, SR.wallH, SR.halfL*2,  SR.halfW, SR.wallH/2, 0));
-
-// Plinthe noire au sol contour
-const plinthMat = new THREE.MeshStandardMaterial({ color:0x14141A, roughness:0.7 });
+// Plinthe noire au sol contour (intérieur)
+const plinthMat = MAT.steelBlack;
 [
   [SR.halfW*2, 0.1, SR.wallT*1.3, 0, 0.05, -SR.halfL + 0.05],
   [SR.halfW*2, 0.1, SR.wallT*1.3, 0, 0.05,  SR.halfL - 0.05],
@@ -449,13 +517,166 @@ const plinthMat = new THREE.MeshStandardMaterial({ color:0x14141A, roughness:0.7
   p.position.set(x, y, z); scene.add(p);
 });
 
-// Plafond avec beams + spots LED
-const ceilMat = new THREE.MeshStandardMaterial({ color:0x14141A, roughness:0.9 });
-for (let i = -2; i <= 2; i++) {
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(SR.halfW*2 - 0.4, 0.15, 0.22), ceilMat);
-  beam.position.set(0, SR.wallH - 0.08, i * 2.8);
-  beam.castShadow = true;
+// ──── MURS (3 côtés — pas le sud car on entre par là) ────
+function makeWall(w, h, d, x, y, z, mat = MAT.wall) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; fixAO(m);
+  return m;
+}
+scene.add(makeWall(SR.halfW*2, SR.wallH, SR.wallT, 0, SR.wallH/2, -SR.halfL)); // nord (back)
+scene.add(makeWall(SR.wallT, SR.wallH, SR.halfL*2, -SR.halfW, SR.wallH/2, 0)); // ouest
+scene.add(makeWall(SR.wallT, SR.wallH, SR.halfL*2,  SR.halfW, SR.wallH/2, 0)); // est
+// Mur sud avec ouverture centrale (porte d'entrée volet)
+const doorW = 3.0;
+scene.add(makeWall((SR.halfW*2 - doorW)/2, SR.wallH, SR.wallT, -(doorW/2 + (SR.halfW*2 - doorW)/4), SR.wallH/2, SR.halfL));
+scene.add(makeWall((SR.halfW*2 - doorW)/2, SR.wallH, SR.wallT,  (doorW/2 + (SR.halfW*2 - doorW)/4), SR.wallH/2, SR.halfL));
+// Linteau au-dessus de la porte
+scene.add(makeWall(doorW, SR.wallH - 2.3, SR.wallT, 0, SR.wallH - (SR.wallH - 2.3)/2, SR.halfL));
+
+// ──── PLAFOND bac acier noir nervuré ────
+// Plaque pleine du plafond (rendue avec normalMap canvas pour les nervures)
+function makeCorrugatedNormalMap() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+  const ctx = c.getContext('2d');
+  // base normale neutre (bleu = 0,0,1)
+  ctx.fillStyle = '#8080FF'; ctx.fillRect(0, 0, 512, 512);
+  // nervures verticales
+  for (let x = 0; x < 512; x += 32) {
+    const grad = ctx.createLinearGradient(x, 0, x + 32, 0);
+    grad.addColorStop(0,    '#5050FF');  // bord gauche (normal -X)
+    grad.addColorStop(0.5,  '#8080FF');  // crête
+    grad.addColorStop(1,    '#B0B0FF');  // bord droit (normal +X)
+    ctx.fillStyle = grad; ctx.fillRect(x, 0, 32, 512);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(8, 4);
+  return tex;
+}
+MAT.ceiling.normalMap = makeCorrugatedNormalMap();
+MAT.ceiling.needsUpdate = true;
+
+const ceiling = new THREE.Mesh(new THREE.BoxGeometry(SR.halfW*2 - 0.2, 0.08, SR.halfL*2 - 0.2), MAT.ceiling);
+ceiling.position.y = SR.wallH - 0.04; ceiling.receiveShadow = true; fixAO(ceiling);
+scene.add(ceiling);
+
+// ──── POUTRES IPN noires apparentes (croix au plafond) ────
+function makeIPN(length, axis) {
+  // Profil en I : 2 ailes + âme
+  const g = new THREE.Group();
+  const flangeW = 0.22, flangeT = 0.04, webT = 0.04, h = 0.24;
+  const fA = new THREE.Mesh(new THREE.BoxGeometry(length, flangeT, flangeW), MAT.steelBlack);
+  fA.position.y = h/2 - flangeT/2;
+  const fB = new THREE.Mesh(new THREE.BoxGeometry(length, flangeT, flangeW), MAT.steelBlack);
+  fB.position.y = -h/2 + flangeT/2;
+  const web = new THREE.Mesh(new THREE.BoxGeometry(length, h - flangeT*2, webT), MAT.steelBlack);
+  g.add(fA); g.add(fB); g.add(web);
+  if (axis === 'z') g.rotation.y = Math.PI/2;
+  return castAll(g);
+}
+// 3 poutres dans la longueur (axe X), 2 dans la largeur (axe Z)
+for (const z of [-3.5, 0, 3.5]) {
+  const beam = makeIPN(SR.halfW*2 - 0.2, 'x');
+  beam.position.set(0, SR.wallH - 0.34, z);
   scene.add(beam);
+}
+for (const x of [-5, 5]) {
+  const beam = makeIPN(SR.halfL*2 - 0.2, 'z');
+  beam.position.set(x, SR.wallH - 0.34, 0);
+  scene.add(beam);
+}
+
+// ──── 6 COLONNES IPN noires verticales (PAAL signature) ────
+function makeColumnIPN(h) {
+  const g = new THREE.Group();
+  const flangeW = 0.22, flangeT = 0.04, webT = 0.04, w = 0.24;
+  const fA = new THREE.Mesh(new THREE.BoxGeometry(flangeW, h, flangeT), MAT.steelBlack);
+  fA.position.z = w/2 - flangeT/2;
+  const fB = new THREE.Mesh(new THREE.BoxGeometry(flangeW, h, flangeT), MAT.steelBlack);
+  fB.position.z = -w/2 + flangeT/2;
+  const web = new THREE.Mesh(new THREE.BoxGeometry(webT, h, w - flangeT*2), MAT.steelBlack);
+  g.add(fA); g.add(fB); g.add(web);
+  return castAll(g);
+}
+// Colonnes positionnées à l'intersection des poutres (intérieur)
+const COL_POSITIONS = [
+  [-5, -3.5], [0, -3.5], [5, -3.5],
+  [-5,  3.5], [0,  3.5], [5,  3.5],
+];
+COL_POSITIONS.forEach(([x, z]) => {
+  const col = makeColumnIPN(SR.wallH - 0.4);
+  col.position.set(x, (SR.wallH - 0.4)/2, z);
+  scene.add(col);
+});
+
+// =========================================================
+// FAÇADE EXTÉRIEURE — bâtiment industriel Le battant
+// Style Monsieur Store : bardage anthracite vertical + enseigne caisson noir
+// Vue depuis le hero waypoint (camera devant, dehors)
+// =========================================================
+const FACADE_Z = SR.halfL + 0.12;  // façade collée au mur sud
+const FACADE_H = SR.wallH + 1.6;    // dépasse un peu au-dessus pour le caisson
+const FACADE_W = SR.halfW*2 + 2.0;  // dépasse latéralement
+
+// Plaque bardage gauche
+function placeFacadePanel(w, x) {
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(w, FACADE_H, 0.08), MAT.cladding);
+  panel.position.set(x, FACADE_H/2 - 0.1, FACADE_Z);
+  panel.castShadow = true; panel.receiveShadow = true; fixAO(panel);
+  scene.add(panel);
+  return panel;
+}
+const facadeW_each = (FACADE_W - doorW) / 2;
+placeFacadePanel(facadeW_each, -(doorW/2 + facadeW_each/2));
+placeFacadePanel(facadeW_each,  (doorW/2 + facadeW_each/2));
+// Linteau bardage (au-dessus de la porte)
+const facadeTop = new THREE.Mesh(new THREE.BoxGeometry(doorW, FACADE_H - 2.3, 0.08), MAT.cladding);
+facadeTop.position.set(0, 2.3 + (FACADE_H - 2.3)/2 - 0.1, FACADE_Z);
+facadeTop.castShadow = true; facadeTop.receiveShadow = true; fixAO(facadeTop);
+scene.add(facadeTop);
+
+// ──── ENSEIGNE caisson noir « le battant » au-dessus de la porte ────
+function makeSignageTexture() {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 200;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#0B0B0F'; ctx.fillRect(0, 0, 1024, 200);
+  // « le battant » en Pacifico (script web font peut ne pas être chargé, fallback italic)
+  ctx.fillStyle = '#F5F0E1';
+  ctx.font = 'italic bold 96px "Pacifico", cursive';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('le battant', 512, 110);
+  // pointes de rose accent
+  ctx.fillStyle = '#C5322D';
+  ctx.fillRect(60, 175, 30, 5);
+  ctx.fillRect(934, 175, 30, 5);
+  // petit logo dot
+  ctx.fillStyle = '#8FAF89';
+  ctx.beginPath(); ctx.arc(880, 110, 16, 0, Math.PI*2); ctx.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const signageMat = new THREE.MeshStandardMaterial({
+  map: makeSignageTexture(),
+  emissive: 0xF5F0E1, emissiveIntensity: 0.18,
+  roughness: 0.4, metalness: 0.2
+});
+const signage = new THREE.Mesh(new THREE.BoxGeometry(doorW + 0.8, 1.1, 0.18), signageMat);
+signage.position.set(0, SR.wallH + 0.55, FACADE_Z + 0.13);
+scene.add(signage);
+
+// ──── PARKING ASPHALTE devant le bâtiment ────
+const parking = new THREE.Mesh(new THREE.BoxGeometry(40, 0.1, 18), MAT.asphalt);
+parking.position.set(0, -0.07, SR.halfL + 9);
+parking.receiveShadow = true; fixAO(parking);
+scene.add(parking);
+
+// ──── 2 BORDURES BÉTON CLAIR au pied de la façade ────
+const curbMat = new THREE.MeshStandardMaterial({ color: 0xB0B0AC, roughness: 0.9 });
+for (const x of [-FACADE_W/3, FACADE_W/3]) {
+  const curb = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 0.4), curbMat);
+  curb.position.set(x, 0.01, FACADE_Z - 0.3);
+  scene.add(curb);
 }
 
 // Spots dans le plafond (4 spots ciblant chaque volet)
@@ -480,8 +701,52 @@ function makeSpot(x, z, targetX, targetY, targetZ, color = 0xFFEEC0, intensity =
   return s;
 }
 
-// Ambient + key very low (HDRI fait l'essentiel)
-scene.add(new THREE.AmbientLight(0xF5F0E1, 0.08));
+// =========================================================
+// LIGHTING
+// Extérieur : 1 sun directional (HDRI + sunlight key)
+// Intérieur : downlights chauds plafond + spots track focalisés sur volets (gérés par makeSpot dans la boucle VOLETS plus bas)
+// =========================================================
+scene.add(new THREE.AmbientLight(0xF5F0E1, 0.06));
+
+// Sun extérieur
+const sun = new THREE.DirectionalLight(0xFFD8A8, 1.6);
+sun.position.set(8, 14, 18);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -16; sun.shadow.camera.right = 16;
+sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
+sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 50;
+sun.shadow.bias = -0.0001;
+scene.add(sun);
+
+// Downlights ronds chauds au plafond (3000K) — alignés sous les poutres IPN, ambiance showroom premium
+function makeDownlight(x, z, intensity = 6, color = 0xFFC78A) {
+  const light = new THREE.PointLight(color, intensity, 7, 1.6);
+  light.position.set(x, SR.wallH - 0.5, z);
+  light.castShadow = false;  // skip pour perf — les spots gèrent les ombres
+  scene.add(light);
+  // Boîtier downlight visible
+  const ring = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 0.12, 0.05, 24),
+    new THREE.MeshStandardMaterial({ color: 0x14141A, roughness: 0.4, metalness: 0.6 })
+  );
+  ring.position.set(x, SR.wallH - 0.12, z);
+  scene.add(ring);
+  // Émissif lumineux à l'intérieur du boitier
+  const bulb = new THREE.Mesh(
+    new THREE.CircleGeometry(0.085, 24),
+    new THREE.MeshStandardMaterial({ color: 0xFFEED0, emissive: 0xFFEED0, emissiveIntensity: 2.5 })
+  );
+  bulb.position.set(x, SR.wallH - 0.13, z);
+  bulb.rotation.x = Math.PI/2;
+  scene.add(bulb);
+}
+// Grille 4×3 de downlights dans le showroom
+for (const x of [-6, -2, 2, 6]) {
+  for (const z of [-4.5, 0, 4.5]) {
+    makeDownlight(x, z, 4.5);
+  }
+}
 
 // =========================================================
 // VOLET FACTORIES — 4 types unique geometries
@@ -822,17 +1087,27 @@ heroRightPivot.position.set(0.6, 0, 0);
 heroRight.position.x = -0.3;
 heroRightPivot.add(heroRight);
 heroVolet.add(heroRightPivot);
-heroVolet.position.set(0, 1.05, SR.halfL + 0.1);  // devant le mur sud
-heroVolet.scale.setScalar(1.4);
+// VOLET PORTE D'ENTRÉE — dimensions porte réelles (3m × 2.3m)
+heroVolet.position.set(0, 1.18, SR.halfL + 0.04);
+heroVolet.scale.set(2.5, 1.2, 1.5);
 scene.add(heroVolet);
 
-// Petit emissive derrière les volets (lumière qui sort)
+// Lumière chaude qui sort du bâtiment (visible quand le volet s'ouvre)
 const heroGlow = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.8, 2.2),
-  new THREE.MeshStandardMaterial({ color:0xFFAA66, emissive:0xFFAA66, emissiveIntensity:0.35, side:THREE.DoubleSide })
+  new THREE.PlaneGeometry(doorW - 0.2, 2.1),
+  new THREE.MeshStandardMaterial({ color:0xFFCC88, emissive:0xFFCC88, emissiveIntensity:0.55, side:THREE.DoubleSide })
 );
-heroGlow.position.set(0, 1.4, SR.halfL + 0.18);
+heroGlow.position.set(0, 1.18, SR.halfL - 0.05);
 scene.add(heroGlow);
+
+// Spot light qui sort par la porte ouverte (effet halo)
+const doorBeam = new THREE.SpotLight(0xFFCC88, 0, 12, Math.PI/4.5, 0.6, 1.2);
+doorBeam.position.set(0, 1.6, SR.halfL - 0.3);
+const doorBeamTarget = new THREE.Object3D();
+doorBeamTarget.position.set(0, 0.5, SR.halfL + 6);
+scene.add(doorBeamTarget);
+doorBeam.target = doorBeamTarget;
+scene.add(doorBeam);
 
 // =========================================================
 // CAMERA PATH — 10 waypoints
@@ -842,20 +1117,22 @@ scene.add(heroGlow);
 // 3-10: each volet
 // 11: outro
 // =========================================================
+// Caméra : on commence DEHORS, face à la façade. Scroll → on s'approche, le volet
+// porte d'entrée s'ouvre, on franchit, on visite, on sort par le haut.
 const WP = [
-  { p:[0, 2.5, 14],         l:[0, 1.4, 7] },          // 0 — extérieur sud, regard sur le hero
-  { p:[0, 1.65, 10],        l:[0, 1.5, 7] },          // 1 — devant la porte d'entrée
-  { p:[0, 1.65, 7.5],       l:[0, 1.5, 5] },          // 2 — vient juste d'entrer
-  // 3 → 10 : passer devant chaque volet (sud puis ouest puis nord puis est-ish)
-  { p:[ 7, 1.65,  3.5],     l:[ 7, 1.3,  5.0] },      // 3 — devant V4 coulissant (sud-est)
-  { p:[-7, 1.65,  3.5],     l:[-7, 1.3,  5.0] },      // 4 — devant V5 brise-vue (sud-ouest)
-  { p:[-2.4, 1.65,  3.0],   l:[-2.4, 1.3,  5.0] },    // 5 — devant V6 brise-soleil
-  { p:[ 2.4, 1.65,  3.0],   l:[ 2.4, 1.3,  5.0] },    // 6 — devant V7 (oups doublon, ajustons)
-  { p:[ 7, 1.65, -3.5],     l:[ 7, 1.3, -5.0] },      // 7 — V3 pliant suspendu (nord-est)
-  { p:[ 2.4, 1.65, -3.0],   l:[ 2.4, 1.3, -5.0] },    // 8 — V2 pliant
-  { p:[-2.4, 1.65, -3.0],   l:[-2.4, 1.3, -5.0] },    // 9 — V1 battant dormant
-  { p:[-7, 1.65, -3.5],     l:[-7, 1.3, -5.0] },      // 10 — V0 battant à gond
-  { p:[0, 4.5, -2],         l:[0, 1.0, 0] },          // 11 — outro overview
+  { p:[0, 3.2, 22],         l:[0, 2.4, 7] },          // 0 — extérieur LOIN, vue d'ensemble façade
+  { p:[0, 2.2, 14],         l:[0, 1.8, 8] },          // 1 — extérieur, on s'approche
+  { p:[0, 1.65, 9.2],       l:[0, 1.5, 7] },          // 2 — devant le volet porte (qui s'ouvre)
+  { p:[0, 1.65, 6.2],       l:[0, 1.5, 4] },          // 3 — vient juste de franchir
+  { p:[ 7, 1.65,  4.2],     l:[ 7, 1.3,  5.2] },      // 4 — V4 coulissant suspendu (sud-est)
+  { p:[ 2.4, 1.65,  4.0],   l:[ 2.4, 1.3,  5.2] },    // 5 — V6 brise-soleil
+  { p:[-2.4, 1.65,  4.0],   l:[-2.4, 1.3,  5.2] },    // 6 — V5 brise-vue (centre)
+  { p:[-7, 1.65,  4.2],     l:[-7, 1.3,  5.2] },      // 7 — V7 séparatif balcon (sud-ouest)
+  { p:[-7, 1.65, -4.2],     l:[-7, 1.3, -5.2] },      // 8 — V0 battant à gond (nord-ouest)
+  { p:[-2.4, 1.65, -4.0],   l:[-2.4, 1.3, -5.2] },    // 9 — V1 battant dormant
+  { p:[ 2.4, 1.65, -4.0],   l:[ 2.4, 1.3, -5.2] },    // 10 — V2 pliant
+  { p:[ 7, 1.65, -4.2],     l:[ 7, 1.3, -5.2] },      // 11 — V3 pliant suspendu (nord-est)
+  { p:[0, 5.5, -3],         l:[0, 1.0, 1] },          // 12 — outro overview du showroom
 ];
 
 const posCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.5);
@@ -884,7 +1161,7 @@ updateScrollT();
 const dots = [...document.querySelectorAll('#progress .dot')];
 const hint = document.getElementById('scroll-hint');
 function updateHUD() {
-  const idx = Math.min(9, Math.round(scrollT * 10));
+  const idx = Math.min(10, Math.round(scrollT * 11));
   dots.forEach((d, i) => {
     d.classList.toggle('active', i === idx);
     d.classList.toggle('passed', i < idx);
@@ -911,12 +1188,13 @@ function loop() {
   scrollT += (targetT - scrollT) * 0.045;
   const t = Math.max(0, Math.min(1, scrollT));
 
-  // Hero volets — ouverture entre t=0.0 et t=0.15
-  const openT = Math.max(0, Math.min(1, t / 0.15));
+  // Volet porte d'entrée — ouverture entre t=0.08 (caméra arrive devant la porte) et t=0.20 (juste passée)
+  const openT = Math.max(0, Math.min(1, (t - 0.06) / 0.14));
   const openEased = easeInOutCubic(openT);
-  heroLeftPivot.rotation.y = -openEased * Math.PI * 0.6;
-  heroRightPivot.rotation.y = openEased * Math.PI * 0.6;
-  heroGlow.material.emissiveIntensity = 0.35 + openEased * 0.5;
+  heroLeftPivot.rotation.y = -openEased * Math.PI * 0.62;
+  heroRightPivot.rotation.y = openEased * Math.PI * 0.62;
+  heroGlow.material.emissiveIntensity = 0.55 + openEased * 0.6;
+  doorBeam.intensity = openEased * 14;  // halo qui sort du bâtiment
 
   // Caméra suit le path
   const tC = Math.max(0, Math.min(1, t));
@@ -928,9 +1206,17 @@ function loop() {
   composer.render();
   requestAnimationFrame(loop);
 }
+// Démarre la loop tout de suite (le rendu commence, le loader masque la scène)
 loop();
 
-setTimeout(() => document.getElementById('loader').classList.add('gone'), 2200);
+// Cache le loader UNIQUEMENT quand toutes les ressources (textures + HDRI) sont chargées
+ALL_LOADED.then(() => {
+  if (lProg) lProg.textContent = `Prêt — scrolle pour entrer`;
+  setTimeout(() => document.getElementById('loader').classList.add('gone'), 320);
+});
+
+// Failsafe : si quelque chose met >15s à charger, on cache quand même le loader
+setTimeout(() => document.getElementById('loader').classList.add('gone'), 15000);
 </script>
 </body>
 </html>
