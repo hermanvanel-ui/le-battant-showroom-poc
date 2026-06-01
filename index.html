@@ -114,16 +114,47 @@
   section[data-room]:not([data-room="0"]) .container { display:none; }
 
   @media (max-width:760px) {
-    .volet-pin { width:280px; padding:14px 18px; }
-    .pin-title { font-size:22px; }
-    .pin-spec { font-size:13px; }
-    #progress { right:12px; padding:10px 6px; gap:8px; }
-    #brand .b1 { font-size:22px; }
-    section.right .container, section.left .container { margin-left:auto; margin-right:auto; text-align:center; }
-    section.right .accent-bar, section.left .accent-bar { margin-left:auto; margin-right:auto; }
-    .lead { text-align:center; margin-left:auto; margin-right:auto; }
+    /* Sections plus courtes en mobile (160vh → 110vh) — moins de scroll mais reste confortable */
+    section { min-height:110vh; padding:60px 20px; }
+
+    /* Pin compact mais lisible */
+    .volet-pin {
+      width:calc(100vw - 40px); max-width:300px;
+      padding:12px 16px; border-left-width:3px;
+    }
+    .pin-kicker { font-size:10px; letter-spacing:0.25em; margin-bottom:6px; }
+    .pin-title { font-size:20px; margin-bottom:8px; }
+    .pin-spec { font-size:13px; line-height:1.45; }
+
+    /* HUD : dots plus petits et collés au bord, mais cliquables */
+    #progress { right:8px; padding:8px 4px; gap:7px; }
+    #progress .dot { width:6px; height:6px; }
+
+    /* Brand label réduit */
+    #brand { top:14px; left:14px; padding:8px 12px; }
+    #brand .b1 { font-size:18px; }
+    #brand .b2 { font-size:8px; letter-spacing:0.3em; }
+
+    /* Hero text — sectionne, n'overflow pas */
+    h1 { font-size:42px; line-height:1; margin-bottom:14px; }
+    h2 { font-size:30px; line-height:1; margin-bottom:10px; }
+    .lead { font-size:14px; line-height:1.45; max-width:100%; }
+
+    /* Sections de description (s1-s8) : centré, sobre */
+    section.right .container, section.left .container {
+      margin-left:auto; margin-right:auto; text-align:center; max-width:90vw;
+    }
+    section.right .accent-bar, section.left .accent-bar {
+      margin-left:auto; margin-right:auto;
+    }
     .specs { display:inline-block; text-align:left; }
-    h1 { font-size:48px; } h2 { font-size:34px; }
+
+    /* Hint scroll — plus petit */
+    #scroll-hint .arrow { height:24px; }
+    #scroll-hint .label { font-size:8px; letter-spacing:0.3em; }
+
+    /* Btn CTA outro */
+    .btn-cta { padding:12px 22px; font-size:11px; }
   }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -376,7 +407,10 @@ scene.background = new THREE.Color(0xC4B89A);
 // Fog atmosphérique léger (visible surtout dans le showroom intérieur, donne de la profondeur)
 scene.fog = new THREE.FogExp2(0x9E9070, 0.012);
 
-const camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 300);
+// FOV dynamique : portrait (mobile) → 65° pour voir plus large sans cramer le plafond ; landscape → 46°
+// Compromis : horizontal visible 32° (vs 22° à 46°) + vertical 65° (vs ceiling à 72°+)
+function computeFOV() { return (innerHeight > innerWidth) ? 65 : 46; }
+const camera = new THREE.PerspectiveCamera(computeFOV(), innerWidth/innerHeight, 0.1, 300);
 
 const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
 // Fallback à 1280x720 si la page démarre avec un viewport 0x0 (tab cachée au boot via Preview MCP/headless)
@@ -406,6 +440,7 @@ composer.addPass(bloomPass);
 composer.addPass(outputPass);
 
 addEventListener('resize', () => {
+  camera.fov = computeFOV();  // recompute FOV en cas de rotation portrait↔landscape
   camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
@@ -1324,12 +1359,9 @@ VOLETS.forEach((v, i) => {
   div.className = 'volet-pin';
   div.innerHTML = `<div class="pin-kicker">${t.kicker}</div><div class="pin-title">${t.title}</div><div class="pin-spec">${t.spec}</div>`;
   document.body.appendChild(div);
-  // Ancrage en 3D à HAUTEUR D'ŒIL (1.7m, retour Herman v0.10 "texte trop bas")
-  // - V0 (avec image à droite du mur) : pin à GAUCHE du mur pour éviter chevauchement
-  // - Autres : pin à droite du board
-  const anchor = v.image
-    ? new THREE.Vector3(v.pos[0] - 1.0, 1.7, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2))
-    : new THREE.Vector3(v.pos[0] + 1.05, 1.7, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2));
+  // Ancrage en 3D : SOUS le board, centré horizontalement
+  // Marche desktop ET mobile, pas de chevauchement avec image/board, pas d'off-screen en portrait
+  const anchor = new THREE.Vector3(v.pos[0], 0.5, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2));
   PINS.push({ div, anchor });
 });
 
