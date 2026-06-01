@@ -58,15 +58,19 @@
     border-radius:2px; margin-bottom:18px; background:rgba(8,8,12,0.55); backdrop-filter:blur(8px);
   }
   .kicker.accent { color:var(--rouge); border-color:rgba(197,50,45,0.5); }
-  h1 { font-size:clamp(44px, 8vw, 88px); font-weight:800; letter-spacing:-0.02em; line-height:0.95; margin-bottom:18px; }
+  h1 { font-size:clamp(44px, 8vw, 88px); font-weight:800; letter-spacing:-0.02em; line-height:0.95; margin-bottom:18px;
+    text-shadow: 0 0 16px rgba(0,0,0,0.85), 0 2px 8px rgba(0,0,0,0.65); }
   h1 .accent { color:var(--rouge); }
-  h2 { font-size:clamp(32px, 6vw, 60px); font-weight:800; letter-spacing:-0.02em; line-height:1; margin-bottom:14px; }
-  .accent-bar { display:block; width:48px; height:3px; background:var(--rouge); margin:0 0 18px; }
-  .lead { font-size:17px; line-height:1.55; color:var(--creme-soft); max-width:440px; }
+  h2 { font-size:clamp(32px, 6vw, 60px); font-weight:800; letter-spacing:-0.02em; line-height:1; margin-bottom:14px;
+    text-shadow: 0 0 16px rgba(0,0,0,0.85), 0 2px 8px rgba(0,0,0,0.65); }
+  .accent-bar { display:block; width:48px; height:3px; background:var(--rouge); margin:0 0 18px; box-shadow:0 0 12px rgba(197,50,45,0.7); }
+  .lead { font-size:17px; line-height:1.55; color:var(--creme); max-width:440px;
+    text-shadow: 0 0 12px rgba(0,0,0,0.85), 0 2px 6px rgba(0,0,0,0.7); }
   .lead.center { margin:0 auto; }
 
   .specs { list-style:none; margin-top:14px; }
-  .specs li { font-size:13px; line-height:1.6; color:var(--creme-soft); padding-left:18px; position:relative; }
+  .specs li { font-size:13px; line-height:1.6; color:var(--creme); padding-left:18px; position:relative;
+    text-shadow: 0 0 10px rgba(0,0,0,0.85), 0 1px 4px rgba(0,0,0,0.7); }
   .specs li::before { content:"›"; position:absolute; left:0; color:var(--rouge); font-weight:bold; }
 
   section.hero { text-align:center; }
@@ -126,7 +130,6 @@
   <div class="dot" data-i="7"></div>
   <div class="dot" data-i="8"></div>
   <div class="dot" data-i="9"></div>
-  <div class="dot" data-i="10"></div>
 </div>
 
 <div id="scroll-hint"><div class="arrow"></div><div class="label">Scrolle</div></div>
@@ -134,23 +137,13 @@
 <main>
   <section class="hero" data-room="0">
     <div class="container">
-      <span class="kicker accent">Showroom 3D · Le battant</span>
+      <span class="kicker accent">Le battant</span>
       <h1>8 volets.<br><span class="accent">Un showroom.</span></h1>
       <span class="accent-bar"></span>
-      <p class="lead center">Bienvenue dans l'atelier-showroom Le battant. Scrolle pour t'avancer : le volet d'entrée s'ouvre, tu rentres, et tu visites les 8 modèles dans leurs conditions de pose.</p>
     </div>
   </section>
 
-  <section class="hero" data-room="1">
-    <div class="container">
-      <span class="kicker">Entrée · Le volet ouvre la porte</span>
-      <h2>Pousse la porte.<br><span style="color:var(--rouge)">Au sens propre.</span></h2>
-      <span class="accent-bar"></span>
-      <p class="lead center">Notre porte d'entrée n'est pas une porte. C'est un volet battant. Démonstration vivante de ce qu'on fabrique. Scrolle, ça s'ouvre.</p>
-    </div>
-  </section>
-
-  <section class="left" data-room="2">
+  <section class="left" data-room="1">
     <div class="container">
       <span class="kicker">Modèle 01 / 08</span>
       <h2>Battant à gond.</h2>
@@ -365,13 +358,15 @@ scene.fog = new THREE.FogExp2(0x9E9070, 0.012);
 const camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 300);
 
 const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
-renderer.setSize(innerWidth, innerHeight);
+// Fallback à 1280x720 si la page démarre avec un viewport 0x0 (tab cachée au boot via Preview MCP/headless)
+const _initW = Math.max(innerWidth, 1280), _initH = Math.max(innerHeight, 720);
+renderer.setSize(_initW, _initH);
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 0.85;  // baissé pour lisibilité des textes HTML (retour Herman 2026-06-01)
 wrap.appendChild(renderer.domElement);
 
 const renderPass = new RenderPass(scene, camera);
@@ -381,7 +376,7 @@ ssaoPass.kernelRadius = 0.32;
 ssaoPass.minDistance = 0.001;
 ssaoPass.maxDistance = 0.08;
 ssaoPass.output = SSAOPass.OUTPUT.Default;
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.35, 0.55, 0.82);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.22, 0.5, 0.88);
 const outputPass = new OutputPass();
 const composer = new EffectComposer(renderer);
 composer.addPass(renderPass);
@@ -636,6 +631,41 @@ facadeTop.position.set(0, 2.3 + (FACADE_H - 2.3)/2 - 0.1, FACADE_Z);
 facadeTop.castShadow = true; facadeTop.receiveShadow = true; fixAO(facadeTop);
 scene.add(facadeTop);
 
+// ──── ENCADREMENT VERT VOLET autour de la porte (palette Fight Night Le battant) ────
+// Vert deep #4A6347 — montants verticaux + linteau de la porte d'entrée
+const greenDeepMat = new THREE.MeshPhysicalMaterial({
+  color: 0x4A6347, metalness: 0.4, roughness: 0.55, clearcoat: 0.6
+});
+const greenVoletMat = new THREE.MeshPhysicalMaterial({
+  color: 0x8FAF89, metalness: 0.3, roughness: 0.5, clearcoat: 0.55
+});
+// Encadrement porte : 2 montants verticaux extérieurs en vert deep
+const frameT = 0.14, frameW = 0.30;
+const leftJamb = new THREE.Mesh(new THREE.BoxGeometry(frameW, 2.3, frameT), greenDeepMat);
+leftJamb.position.set(-doorW/2 - frameW/2, 1.15, FACADE_Z + 0.06);
+scene.add(leftJamb);
+const rightJamb = leftJamb.clone(); rightJamb.position.x = doorW/2 + frameW/2; scene.add(rightJamb);
+
+// Bande horizontale vert volet AU-DESSUS du linteau (sous l'enseigne)
+const greenBand = new THREE.Mesh(new THREE.BoxGeometry(doorW + frameW*2 + 0.4, 0.22, 0.12), greenVoletMat);
+greenBand.position.set(0, 2.3 + 0.18, FACADE_Z + 0.1);
+scene.add(greenBand);
+
+// Bande rouge sang Fight Night très fine sous la bande verte (signature)
+const roseAccentMat = new THREE.MeshStandardMaterial({
+  color: 0xC5322D, emissive: 0xC5322D, emissiveIntensity: 0.35, roughness: 0.4
+});
+const roseLine = new THREE.Mesh(new THREE.BoxGeometry(doorW + frameW*2 + 0.4, 0.04, 0.13), roseAccentMat);
+roseLine.position.set(0, 2.3 + 0.05, FACADE_Z + 0.11);
+scene.add(roseLine);
+
+// 2 plaquettes vert volet sur les panneaux bardage (touches d'identité)
+for (const x of [-FACADE_W/2 + 1.5, FACADE_W/2 - 1.5]) {
+  const plaque = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.04), greenVoletMat);
+  plaque.position.set(x, 1.6, FACADE_Z + 0.06);
+  scene.add(plaque);
+}
+
 // ──── ENSEIGNE caisson noir « le battant » au-dessus de la porte ────
 function makeSignageTexture() {
   const c = document.createElement('canvas'); c.width = 1024; c.height = 200;
@@ -708,10 +738,11 @@ function makeSpot(x, z, targetX, targetY, targetZ, color = 0xFFEEC0, intensity =
 // Intérieur : downlights chauds plafond + spots track focalisés sur volets (gérés par makeSpot dans la boucle VOLETS plus bas)
 // =========================================================
 // Ambient chaud pour contrer la froideur du HDRI à l'intérieur du showroom
-scene.add(new THREE.AmbientLight(0xFFE8C8, 0.45));
+// Baissé pour lisibilité des textes HTML par-dessus la scène (retour Herman 2026-06-01)
+scene.add(new THREE.AmbientLight(0xFFE8C8, 0.28));
 
 // Lumière hémisphérique chaude au-dessus du showroom (sol chauffé par les downlights)
-const showroomFill = new THREE.HemisphereLight(0xFFD8A8, 0x8a7a5a, 0.35);
+const showroomFill = new THREE.HemisphereLight(0xFFD8A8, 0x8a7a5a, 0.2);
 showroomFill.position.set(0, SR.wallH - 0.5, 0);
 scene.add(showroomFill);
 
@@ -748,10 +779,10 @@ function makeDownlight(x, z, intensity = 6, color = 0xFFC78A) {
   bulb.rotation.x = Math.PI/2;
   scene.add(bulb);
 }
-// Grille 4×3 de downlights dans le showroom (intensité boostée pour contrer HDRI)
+// Grille 4×3 de downlights dans le showroom (intensité modérée — éviter de cramer les textes HTML)
 for (const x of [-6, -2, 2, 6]) {
   for (const z of [-4.5, 0, 4.5]) {
-    makeDownlight(x, z, 14);
+    makeDownlight(x, z, 7);
   }
 }
 
@@ -1124,26 +1155,35 @@ scene.add(doorBeam);
 // 3-10: each volet
 // 11: outro
 // =========================================================
-// Caméra : on commence DEHORS, face à la façade. Scroll → on s'approche, le volet
-// porte d'entrée s'ouvre, on franchit, on visite, on sort par le haut.
+// Caméra : on démarre face au bâtiment (resserré, pas vue large). Scroll → on s'approche,
+// le volet porte d'entrée s'ouvre, on franchit, on visite en U autour du showroom
+// (sud est→ouest, puis nord ouest→est), on sort par le haut. Chemin évite les colonnes IPN à x=±5.
+// Allées de circulation : x dans [-8, -6] (ouest), [-3.5, -1.5] (mid-ouest), [1.5, 3.5] (mid-est), [6, 8] (est) — entre colonnes.
 const WP = [
-  { p:[0, 3.2, 22],         l:[0, 2.4, 7] },          // 0 — extérieur LOIN, vue d'ensemble façade
-  { p:[0, 2.2, 14],         l:[0, 1.8, 8] },          // 1 — extérieur, on s'approche
-  { p:[0, 1.65, 9.2],       l:[0, 1.5, 7] },          // 2 — devant le volet porte (qui s'ouvre)
-  { p:[0, 1.65, 6.2],       l:[0, 1.5, 4] },          // 3 — vient juste de franchir
-  { p:[ 7, 1.65,  4.2],     l:[ 7, 1.3,  5.2] },      // 4 — V4 coulissant suspendu (sud-est)
-  { p:[ 2.4, 1.65,  4.0],   l:[ 2.4, 1.3,  5.2] },    // 5 — V6 brise-soleil
-  { p:[-2.4, 1.65,  4.0],   l:[-2.4, 1.3,  5.2] },    // 6 — V5 brise-vue (centre)
-  { p:[-7, 1.65,  4.2],     l:[-7, 1.3,  5.2] },      // 7 — V7 séparatif balcon (sud-ouest)
-  { p:[-7, 1.65, -4.2],     l:[-7, 1.3, -5.2] },      // 8 — V0 battant à gond (nord-ouest)
-  { p:[-2.4, 1.65, -4.0],   l:[-2.4, 1.3, -5.2] },    // 9 — V1 battant dormant
-  { p:[ 2.4, 1.65, -4.0],   l:[ 2.4, 1.3, -5.2] },    // 10 — V2 pliant
-  { p:[ 7, 1.65, -4.2],     l:[ 7, 1.3, -5.2] },      // 11 — V3 pliant suspendu (nord-est)
-  { p:[0, 5.5, -3],         l:[0, 1.0, 1] },          // 12 — outro overview du showroom
+  { p:[0, 2.4, 12],         l:[0, 2.1, 8] },          // 0 — face au bâtiment (resserré, on voit la façade)
+  { p:[0, 1.85, 9.0],       l:[0, 1.65, 7] },         // 1 — devant le volet porte (qui s'ouvre maintenant)
+  { p:[0, 1.65, 5.6],       l:[0, 1.55, 3] },         // 2 — vient juste de franchir, regard vers l'intérieur
+  // ───────── Allée SUD : on longe le mur sud (z ≈ +4), de est en ouest ─────────
+  { p:[ 7.5, 1.6,  3.8],    l:[ 7.5, 1.4,  5.5] },    // 3 — V4 coulissant suspendu (sud-est)
+  { p:[ 3.0, 1.6,  3.5],    l:[ 3.0, 1.4,  5.5] },    // 4 — V6 brise-soleil (sud mid-est)
+  { p:[-3.0, 1.6,  3.5],    l:[-3.0, 1.4,  5.5] },    // 5 — V5 brise-vue (sud mid-ouest)
+  { p:[-7.5, 1.6,  3.8],    l:[-7.5, 1.4,  5.5] },    // 6 — V7 séparatif balcon (sud-ouest)
+  // ───────── Transition douce SW → NW : on contourne par le mur ouest sans traverser ─────────
+  { p:[-8.2, 1.6,  0],      l:[-7.5, 1.4, -2] },      // 7 — milieu allée ouest (regard tourne vers le nord)
+  // ───────── Allée NORD : on longe le mur nord (z ≈ -4), de ouest en est ─────────
+  { p:[-7.5, 1.6, -3.8],    l:[-7.5, 1.4, -5.5] },    // 8 — V0 battant à gond (nord-ouest)
+  // ───────── ⚠ section 8 = "Pliant" — mais l'ordre HTML est cohérent : 8 sections de volets ─────────
+  // Note : 10 sections HTML (1 hero + 8 volets + 1 outro), 13 WPs au total → mapping smooth
+  { p:[-3.0, 1.6, -3.5],    l:[-3.0, 1.4, -5.5] },    // 9 — V1 battant dormant (nord mid-ouest)
+  { p:[ 3.0, 1.6, -3.5],    l:[ 3.0, 1.4, -5.5] },    // 10 — V2 pliant (nord mid-est)
+  { p:[ 7.5, 1.6, -3.8],    l:[ 7.5, 1.4, -5.5] },    // 11 — V3 pliant suspendu (nord-est)
+  // ───────── Outro : vue plongeante du showroom depuis l'angle SE ─────────
+  { p:[ 6, 5.5, -2],        l:[0, 0.5, 1] },          // 12 — overview
 ];
 
-const posCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.5);
-const lookCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.5);
+// Tension augmentée 0.5→0.85 pour des courbes moins bombées (évite que la caméra s'éloigne des waypoints et entre dans les colonnes)
+const posCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.85);
+const lookCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.85);
 
 // =========================================================
 // SCROLL + LENIS
@@ -1168,7 +1208,7 @@ updateScrollT();
 const dots = [...document.querySelectorAll('#progress .dot')];
 const hint = document.getElementById('scroll-hint');
 function updateHUD() {
-  const idx = Math.min(10, Math.round(scrollT * 11));
+  const idx = Math.min(9, Math.round(scrollT * 10));
   dots.forEach((d, i) => {
     d.classList.toggle('active', i === idx);
     d.classList.toggle('passed', i < idx);
@@ -1195,8 +1235,8 @@ function loop() {
   scrollT += (targetT - scrollT) * 0.045;
   const t = Math.max(0, Math.min(1, scrollT));
 
-  // Volet porte d'entrée — ouverture entre t=0.08 (caméra arrive devant la porte) et t=0.20 (juste passée)
-  const openT = Math.max(0, Math.min(1, (t - 0.06) / 0.14));
+  // Volet porte d'entrée — ouverture entre t=0.04 et t=0.13 (avant l'entrée dans le showroom)
+  const openT = Math.max(0, Math.min(1, (t - 0.04) / 0.09));
   const openEased = easeInOutCubic(openT);
   heroLeftPivot.rotation.y = -openEased * Math.PI * 0.62;
   heroRightPivot.rotation.y = openEased * Math.PI * 0.62;
