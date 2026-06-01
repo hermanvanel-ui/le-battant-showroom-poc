@@ -1157,41 +1157,44 @@ scene.add(doorBeam);
 // 3-10: each volet
 // 11: outro
 // =========================================================
-// PARCOURS v0.5 — retours Herman cumulés :
-// « on rentre tout droit, on va au milieu, ensuite on fait le tour »
-// « il faut quand même passer devant chaque volet »
-// « il y a des poteaux devant les volets » → colonnes repoussées aux extrémités
+// PARCOURS v0.6 — retours Herman cumulés :
+// « les descriptions s'affichent trop tôt » → WPs alignés sur les CENTRES de section HTML
+// « on passe trop proche des derniers volets, on voit rien » → distance 1.7m → 2.8m
+//   (caméra recule de z=±3.5 à z=±2.4 → on voit la totalité du board H=2.2m + cadre)
 //
-// 1. Approche frontale du bâtiment (z=12 → z=5)
-// 2. Pause au centre du showroom (point de vue d'ensemble)
-// 3. Tour PROCHE de chaque volet : caméra à ~1.7m de la cloison, regardant pile le volet
-// 4. Ordre horaire : NW → N → N → NE → SE → S → S → SW
-// 5. Outro vue plongeante depuis le plafond
-//
-// Trajectoires safe : pas de collision (colonnes désormais aux coins extrêmes ±9.4, ±6.4)
+// 10 WPs (1 par section HTML : hero + 8 volets + outro), mappés au centre de chaque section
+// VOLETS dans l'ordre HTML strict :
+//   s1 V0 Battant à gond (NW)        s5 V4 Coulissant suspendu (SW)
+//   s2 V1 Battant à dormant          s6 V5 Brise-vue
+//   s3 V2 Pliant                     s7 V6 Brise-soleil
+//   s4 V3 Pliant suspendu (NE)       s8 V7 Séparatif balcon (SE)
 const WP = [
-  { p:[0, 2.4, 12],         l:[0, 2.1, 8] },          // 0 — face au bâtiment (resserré)
-  { p:[0, 1.85, 9.0],       l:[0, 1.6, 6] },          // 1 — devant le volet porte (qui s'ouvre)
-  { p:[0, 1.7,  4.0],       l:[0, 1.5, 0] },          // 2 — tout droit, on entre dans le showroom
-  { p:[0, 1.65, 0],         l:[0, 1.55, -3] },        // 3 — AU MILIEU, regard vers le nord (vue d'ensemble)
-  // ═══════════════ TOUR — passage devant chaque volet (caméra à ~1.7m du board) ═══════════════
-  // ── Mur NORD (z=-5.2) — on longe d'ouest en est ──
-  { p:[-7, 1.65, -3.5],     l:[-7, 1.65, -5.2] },     // 4 — V0 battant à gond (NW) — pile en face
-  { p:[-2.4, 1.65, -3.5],   l:[-2.4, 1.65, -5.2] },   // 5 — V1 battant dormant (N mid-W)
-  { p:[ 2.4, 1.65, -3.5],   l:[ 2.4, 1.65, -5.2] },   // 6 — V2 pliant (N mid-E)
-  { p:[ 7, 1.65, -3.5],     l:[ 7, 1.65, -5.2] },     // 7 — V3 pliant suspendu (NE)
-  // ── Mur SUD (z=+5.2) — on longe d'est en ouest (symétrie) ──
-  { p:[ 7, 1.65,  3.5],     l:[ 7, 1.65,  5.2] },     // 8 — V4 coulissant suspendu (SE)
-  { p:[ 2.4, 1.65,  3.5],   l:[ 2.4, 1.65,  5.2] },   // 9 — V6 brise-soleil (S mid-E)
-  { p:[-2.4, 1.65,  3.5],   l:[-2.4, 1.65,  5.2] },   // 10 — V5 brise-vue (S mid-W)
-  { p:[-7, 1.65,  3.5],     l:[-7, 1.65,  5.2] },     // 11 — V7 séparatif balcon (SW)
-  // ═══════════════ Outro vue plongeante depuis le plafond ═══════════════
-  { p:[0, 5.8, 0.5],        l:[0, 0.3, 0] },          // 12 — overview vertical
+  // s0 hero — face au bâtiment (camera reste ici scrollT 0 → 0.05, puis transit vers V0)
+  { p:[0, 2.4, 12],         l:[0, 2.1, 7] },          // 0 — hero
+  // ─── Mur NORD (z=-5.2) — ouest → est (s1 à s4) ───
+  { p:[-7, 1.65, -2.4],     l:[-7, 1.65, -5.2] },     // 1 — s1 V0 Battant à gond (NW)
+  { p:[-2.4, 1.65, -2.4],   l:[-2.4, 1.65, -5.2] },   // 2 — s2 V1 Battant à dormant
+  { p:[ 2.4, 1.65, -2.4],   l:[ 2.4, 1.65, -5.2] },   // 3 — s3 V2 Pliant
+  { p:[ 7, 1.65, -2.4],     l:[ 7, 1.65, -5.2] },     // 4 — s4 V3 Pliant suspendu (NE)
+  // ─── Mur SUD (z=+5.2) — ouest → est (s5 à s8, même direction visuelle, symétrique) ───
+  { p:[-7, 1.65,  2.4],     l:[-7, 1.65,  5.2] },     // 5 — s5 V4 Coulissant suspendu (SW)
+  { p:[-2.4, 1.65,  2.4],   l:[-2.4, 1.65,  5.2] },   // 6 — s6 V5 Brise-vue
+  { p:[ 2.4, 1.65,  2.4],   l:[ 2.4, 1.65,  5.2] },   // 7 — s7 V6 Brise-soleil
+  { p:[ 7, 1.65,  2.4],     l:[ 7, 1.65,  5.2] },     // 8 — s8 V7 Séparatif balcon (SE)
+  // s9 outro — vue plongeante depuis le centre du plafond
+  { p:[0, 5.5, 0],          l:[0, 0.4, 0] },          // 9 — outro overview
 ];
 
-// Tension 0.85 — courbe serrée pour ne pas s'éloigner des WPs (passage net devant chaque volet)
-const posCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.85);
-const lookCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.85);
+// alignedT : map scrollT → curve param pour que WP[k] coïncide avec le CENTRE de la section HTML k
+// (chaque section HTML couvre 1/10 du scroll, centrée à (k+0.5)/10 ; WP[k] doit y être placé)
+function alignedT(scrollT) {
+  const s = Math.min(9, Math.max(0, scrollT * 10 - 0.5));  // 0 → 9 (index WP)
+  return s / 9;  // normalisé pour getPoint
+}
+
+// Tension 0.5 — courbes douces (les WPs sont déjà bien placés, pas besoin de courbure serrée)
+const posCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.5);
+const lookCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.5);
 
 // =========================================================
 // SCROLL + LENIS
@@ -1243,18 +1246,20 @@ function loop() {
   scrollT += (targetT - scrollT) * 0.045;
   const t = Math.max(0, Math.min(1, scrollT));
 
-  // Volet porte d'entrée — ouverture entre t=0.04 et t=0.13 (avant l'entrée dans le showroom)
-  const openT = Math.max(0, Math.min(1, (t - 0.04) / 0.09));
+  // Volet porte d'entrée — ouvre pendant le "hold hero" (scrollT 0 → 0.06)
+  // La caméra reste face au bâtiment, le volet s'ouvre, puis elle franchit la porte vers V0
+  const openT = Math.max(0, Math.min(1, t / 0.06));
   const openEased = easeInOutCubic(openT);
   heroLeftPivot.rotation.y = -openEased * Math.PI * 0.62;
   heroRightPivot.rotation.y = openEased * Math.PI * 0.62;
   heroGlow.material.emissiveIntensity = 0.55 + openEased * 0.6;
   doorBeam.intensity = openEased * 14;  // halo qui sort du bâtiment
 
-  // Caméra suit le path
-  const tC = Math.max(0, Math.min(1, t));
-  camera.position.copy(posCurve.getPointAt(tC));
-  lookV.copy(lookCurve.getPointAt(tC));
+  // Caméra suit le path — alignedT() sync les WPs avec les centres des sections HTML
+  // getPoint (pas getPointAt) : interpolation linéaire par segment, WP[k] pile à t = k/(N-1)
+  const tC = alignedT(t);
+  camera.position.copy(posCurve.getPoint(tC));
+  lookV.copy(lookCurve.getPoint(tC));
   camera.lookAt(lookV);
 
   updateHUD();
