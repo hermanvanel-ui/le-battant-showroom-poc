@@ -1079,10 +1079,10 @@ function makeBoardTexture(label, kicker, color) {
 function makeVoletEnPose(aluMat, imageUrl) {
   const g = new THREE.Group();
 
-  // Layout horizontal compact : volet à gauche, image à droite, tout sur le même mur
-  const WF_W = 2.6, WF_H = 2.6, WF_D = 0.35;
-  const VOLET_X = -0.65;  // Centre de l'ouverture+volet (gauche)
-  const IMG_X = +0.78;    // Centre de l'image de réf (droite)
+  // Layout horizontal compact (réduit pour FOV 46° à 3.1m : visible horizontal 2.55m)
+  const WF_W = 2.2, WF_H = 2.6, WF_D = 0.35;
+  const VOLET_X = -0.45;  // Centre de l'ouverture+volet (gauche)
+  const IMG_X = +0.60;    // Centre de l'image de réf (droite)
 
   // --- 1. Mur fragment (pierre claire, tonalité Gemini ref NB) ---
   const stoneWallMat = new THREE.MeshPhysicalMaterial({
@@ -1095,7 +1095,7 @@ function makeVoletEnPose(aluMat, imageUrl) {
   g.add(wallSlab);
 
   // --- 2. Ouverture (fenêtre derrière volet, recessed, glow chaud) ---
-  const WIN_W = 1.2, WIN_H = 1.85;
+  const WIN_W = 1.0, WIN_H = 1.7;
   const winCenterY = WF_H/2 - 0.05;  // légèrement décalé vers le bas
   const winRecess = new THREE.Mesh(
     new THREE.BoxGeometry(WIN_W, WIN_H, 0.18),
@@ -1304,12 +1304,12 @@ VOLETS.forEach((v, i) => {
   div.className = 'volet-pin';
   div.innerHTML = `<div class="pin-kicker">${t.kicker}</div><div class="pin-title">${t.title}</div><div class="pin-spec">${t.spec}</div>`;
   document.body.appendChild(div);
-  // Ancrage en 3D :
-  // - Si v.image (vraie 3D en pose, image à droite) : pin sous l'image (évite chevauchement)
-  // - Sinon : pin standard à droite à hauteur 1.1m
+  // Ancrage en 3D à HAUTEUR D'ŒIL (1.7m, retour Herman v0.10 "texte trop bas")
+  // - V0 (avec image à droite du mur) : pin à GAUCHE du mur pour éviter chevauchement
+  // - Autres : pin à droite du board
   const anchor = v.image
-    ? new THREE.Vector3(v.pos[0] + 1.5, 0.35, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2))
-    : new THREE.Vector3(v.pos[0] + 1.1, 1.1, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2));
+    ? new THREE.Vector3(v.pos[0] - 1.0, 1.7, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2))
+    : new THREE.Vector3(v.pos[0] + 1.05, 1.7, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2));
   PINS.push({ div, anchor });
 });
 
