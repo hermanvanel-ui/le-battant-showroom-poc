@@ -23,7 +23,8 @@
   #scene-wrap canvas { display:block; width:100%; height:100%; }
 
   main { position:relative; z-index:2; pointer-events:none; }
-  section { min-height:100vh; display:flex; align-items:center; padding:80px 24px; }
+  /* Sections 160vh : plus de temps de lecture des descriptions au scroll (retour Herman v0.9) */
+  section { min-height:160vh; display:flex; align-items:center; padding:80px 24px; }
 
   .hud { position:fixed; z-index:5; pointer-events:none; }
   .panel { background:rgba(8,8,12,0.78); border:1px solid rgba(245,240,225,0.14); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
@@ -468,33 +469,37 @@ const MAT = {
   }),
   // Pas de pedestal bois — remplacé par socle béton noir
   pedestal: new THREE.MeshPhysicalMaterial({ color: 0x1B1B22, metalness: 0.2, roughness: 0.6, clearcoat: 0.3 }),
-  // Alu thermolaqué vert-volet (couleur Le battant) — texture painted_metal_shutter tinté
+  // Alu thermolaqué — VRAI métal (pas de diffuse map → plus de grain bois) + clearcoat fort
+  // Retour Herman v0.9 : "en alu les volets oublie pas, on dirait du bois"
+  // Solution : retirer le map diffuse painted_metal_shutter (qui ressemble à du bois peint)
+  // et garder UNIQUEMENT la couleur + propriétés métalliques + clearcoat (laqué)
   aluVert: new THREE.MeshPhysicalMaterial({
     color: 0x8FAF89,
-    map: aluShutterTex.diff,
-    normalMap: aluShutterTex.nor_gl,
-    roughnessMap: aluShutterTex.rough,
-    aoMap: aluShutterTex.ao,
-    metalness: 0.6, roughness: 0.35,
-    clearcoat: 0.55, clearcoatRoughness: 0.25, envMapIntensity: 1.5
+    metalness: 0.88, roughness: 0.30,
+    clearcoat: 0.85, clearcoatRoughness: 0.15,
+    envMapIntensity: 1.35,
+    anisotropy: 0.4
   }),
   aluCreme: new THREE.MeshPhysicalMaterial({
     color: 0xC8C2A8,
-    map: aluShutterTex.diff, normalMap: aluShutterTex.nor_gl,
-    roughnessMap: aluShutterTex.rough, aoMap: aluShutterTex.ao,
-    metalness: 0.55, roughness: 0.4, clearcoat: 0.5, envMapIntensity: 1.5
+    metalness: 0.85, roughness: 0.32,
+    clearcoat: 0.8, clearcoatRoughness: 0.18,
+    envMapIntensity: 1.3,
+    anisotropy: 0.4
   }),
   aluRouge: new THREE.MeshPhysicalMaterial({
     color: 0xC5322D,
-    map: aluShutterTex.diff, normalMap: aluShutterTex.nor_gl,
-    roughnessMap: aluShutterTex.rough, aoMap: aluShutterTex.ao,
-    metalness: 0.65, roughness: 0.34, clearcoat: 0.6, envMapIntensity: 1.6
+    metalness: 0.88, roughness: 0.28,
+    clearcoat: 0.85, clearcoatRoughness: 0.14,
+    envMapIntensity: 1.4,
+    anisotropy: 0.5
   }),
   aluNoir: new THREE.MeshPhysicalMaterial({
     color: 0x1f1f2a,
-    map: aluShutterTex.diff, normalMap: aluShutterTex.nor_gl,
-    roughnessMap: aluShutterTex.rough, aoMap: aluShutterTex.ao,
-    metalness: 0.7, roughness: 0.32, clearcoat: 0.5, envMapIntensity: 1.4
+    metalness: 0.92, roughness: 0.25,
+    clearcoat: 0.9, clearcoatRoughness: 0.12,
+    envMapIntensity: 1.4,
+    anisotropy: 0.5
   }),
   // Quincaillerie (paumelles, poignées) — noir brillant
   hardware: new THREE.MeshPhysicalMaterial({
@@ -1402,13 +1407,31 @@ const TOUR_WP = [
   { p:[-2.4, 1.65, -1.8],   l:[-2.4, 1.65, -5.05] },  // 1 → s2 V1 Battant à dormant
   { p:[ 2.4, 1.65, -1.8],   l:[ 2.4, 1.65, -5.05] },  // 2 → s3 V2 Pliant
   { p:[ 7, 1.65, -1.8],     l:[ 7, 1.65, -5.05] },    // 3 → s4 V3 Pliant suspendu (NE)
+  // 🔁 CENTER TRANSIT — caméra à hauteur d'œil au centre, regarde au sud (prépare V4)
+  // Évite le cut visuel : trajectoire en C-arc à travers le centre + rotation lookAt graduelle
+  { p:[0, 1.65, 0],         l:[0, 1.55, 4] },          // 4 → transit (scrollT 0.50, entre s4 et s5)
   // ─── Mur SUD (z=+5.2) ouest → est ───
-  { p:[-7, 1.65,  1.8],     l:[-7, 1.65,  5.05] },    // 4 → s5 V4 Coulissant suspendu (SW)
-  { p:[-2.4, 1.65,  1.8],   l:[-2.4, 1.65,  5.05] },  // 5 → s6 V5 Brise-vue
-  { p:[ 2.4, 1.65,  1.8],   l:[ 2.4, 1.65,  5.05] },  // 6 → s7 V6 Brise-soleil
-  { p:[ 7, 1.65,  1.8],     l:[ 7, 1.65,  5.05] },    // 7 → s8 V7 Séparatif balcon (SE)
+  { p:[-7, 1.65,  1.8],     l:[-7, 1.65,  5.05] },    // 5 → s5 V4 Coulissant suspendu (SW)
+  { p:[-2.4, 1.65,  1.8],   l:[-2.4, 1.65,  5.05] },  // 6 → s6 V5 Brise-vue
+  { p:[ 2.4, 1.65,  1.8],   l:[ 2.4, 1.65,  5.05] },  // 7 → s7 V6 Brise-soleil
+  { p:[ 7, 1.65,  1.8],     l:[ 7, 1.65,  5.05] },    // 8 → s8 V7 Séparatif balcon (SE)
   // Outro
-  { p:[0, 5.5, 0],          l:[0, 0.4, 0] },          // 8 → s9 outro vue plongeante
+  { p:[0, 5.5, 0],          l:[0, 0.4, 0] },          // 9 → s9 outro vue plongeante
+];
+
+// Ancres scrollT pour chaque WP de TOUR (mapping piecewise linéaire)
+// WP[4] CENTER est placé scrollT=0.50 (entre s4 et s5) — transit fluide
+const TOUR_ANCHORS = [
+  0.15,  // 0 V0
+  0.25,  // 1 V1
+  0.35,  // 2 V2
+  0.45,  // 3 V3
+  0.50,  // 4 CENTER transit
+  0.55,  // 5 V4
+  0.65,  // 6 V5
+  0.75,  // 7 V6
+  0.85,  // 8 V7
+  0.95,  // 9 outro
 ];
 
 const heroPosCurve = new THREE.CatmullRomCurve3(HERO_WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.5);
@@ -1416,20 +1439,31 @@ const heroLookCurve = new THREE.CatmullRomCurve3(HERO_WP.map(w => new THREE.Vect
 const tourPosCurve = new THREE.CatmullRomCurve3(TOUR_WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.5);
 const tourLookCurve = new THREE.CatmullRomCurve3(TOUR_WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.5);
 
-// Sync HTML→3D, mouvement CONTINU (sans cut, fluide d'un bout à l'autre) :
-// - scrollT 0 → 0.15 : phase HERO (face bâtiment → porte ouvre → entre → arrive à V0)
-// - scrollT 0.15 → 0.95 : phase TOUR (V0 à V7 sur 8 segments de 0.10)
-// - scrollT > 0.95 : outro
-// À la frontière scrollT=0.15 : HERO[3] = TOUR[0] = V0 → pos+look identiques → ZERO discontinuité
+// Sync HTML→3D, mouvement CONTINU + transit fluide entre côtés via CENTER WP :
+// - scrollT 0 → 0.15 : phase HERO
+// - scrollT 0.15 → 0.95 : phase TOUR (10 WPs avec CENTER transit à scrollT=0.50)
+//   Mapping piecewise linéaire via TOUR_ANCHORS pour aligner chaque WP avec sa section HTML
+// - À scrollT=0.15 : HERO[3] = TOUR[0] = V0 → continuité ✓
 function getCameraAt(scrollT) {
   if (scrollT < 0.15) {
-    const t = scrollT / 0.15;  // 0 → 1
+    const t = scrollT / 0.15;
     return { pos: heroPosCurve.getPoint(t), look: heroLookCurve.getPoint(t) };
   }
-  // TOUR : 9 WPs (V0..V7 + outro). 8 segments de 0.10 chacun.
-  // TOUR[0] V0 à scrollT 0.15, TOUR[1] V1 à 0.25, ..., TOUR[7] V7 à 0.85, TOUR[8] outro à 0.95
-  // tTour = (scrollT - 0.15) / 0.80
-  const tTour = Math.min(1, (scrollT - 0.15) / 0.80);
+  // Calcul tTour piecewise : trouve les 2 ancres entre lesquelles scrollT tombe, interp linéaire
+  let tTour;
+  if (scrollT >= TOUR_ANCHORS[TOUR_ANCHORS.length - 1]) {
+    tTour = 1;
+  } else {
+    for (let i = 0; i < TOUR_ANCHORS.length - 1; i++) {
+      if (scrollT < TOUR_ANCHORS[i + 1]) {
+        const a = TOUR_ANCHORS[i], b = TOUR_ANCHORS[i + 1];
+        const frac = (scrollT - a) / (b - a);
+        // getPoint t : WP[k] est à t = k/(N-1)
+        tTour = (i + frac) / (TOUR_ANCHORS.length - 1);
+        break;
+      }
+    }
+  }
   return { pos: tourPosCurve.getPoint(tTour), look: tourLookCurve.getPoint(tTour) };
 }
 
