@@ -114,8 +114,8 @@
   section[data-room]:not([data-room="0"]) .container { display:none; }
 
   @media (max-width:760px) {
-    /* Sections plus courtes en mobile (160vh → 110vh) — moins de scroll mais reste confortable */
-    section { min-height:110vh; padding:60px 20px; }
+    /* Sections 160vh en mobile aussi — plus de scroll pour lire confortablement chaque volet */
+    section { min-height:160vh; padding:60px 20px; }
 
     /* Pin compact mais lisible */
     .volet-pin {
@@ -1502,9 +1502,12 @@ function getCameraAt(scrollT) {
     const t = scrollT / 0.15;
     return { pos: heroPosCurve.getPoint(t), look: heroLookCurve.getPoint(t) };
   }
-  // Calcul tTour piecewise + smoothstep easing → camera "hover" plus longtemps sur chaque WP
-  // Au lieu de transit linéaire constant, on accélère au milieu et ralentit aux extrémités
-  // → user a plus de temps pour lire la description quand camera est PRES du volet
+  // Calcul tTour piecewise avec HOLD ZONES (retour Herman v0.13.1 "on passe trop vite sur le premier volet")
+  // Chaque segment a 3 zones:
+  // - 40% début: HOLD à l'ancre A (camera reste sur le volet précédent)
+  // - 20% milieu: TRANSIT rapide
+  // - 40% fin: HOLD à l'ancre B (camera arrive sur le volet suivant)
+  // Donc chaque WP est "vu" pendant 80% du temps autour (40% fin du segment précédent + 40% début du suivant)
   let tTour;
   if (scrollT >= TOUR_ANCHORS[TOUR_ANCHORS.length - 1]) {
     tTour = 1;
@@ -1513,8 +1516,16 @@ function getCameraAt(scrollT) {
       if (scrollT < TOUR_ANCHORS[i + 1]) {
         const a = TOUR_ANCHORS[i], b = TOUR_ANCHORS[i + 1];
         const frac = (scrollT - a) / (b - a);
-        // smoothStep : 3x²−2x³ → 0%/100% endpoints hold longer, fast transit in middle
-        const eased = frac * frac * (3 - 2 * frac);
+        let eased;
+        const HOLD = 0.40;  // 40% hold each end → 20% transit au milieu
+        if (frac < HOLD) {
+          eased = 0;
+        } else if (frac > 1 - HOLD) {
+          eased = 1;
+        } else {
+          const tNorm = (frac - HOLD) / (1 - 2 * HOLD);
+          eased = tNorm * tNorm * (3 - 2 * tNorm);
+        }
         tTour = (i + eased) / (TOUR_ANCHORS.length - 1);
         break;
       }
