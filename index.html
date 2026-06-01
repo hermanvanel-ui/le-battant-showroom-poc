@@ -406,7 +406,7 @@ const hdriPromise = loadHDRI('industrial_sunset_02', '1k').then(hdri => {
     scene.environment = hdri;
     scene.background = hdri;  // ciel visible quand caméra est dehors
     scene.backgroundIntensity = 0.85;
-    scene.environmentIntensity = 1.1;
+    scene.environmentIntensity = 0.55;  // limite la teinte bleutée à l'intérieur (downlights + ambient prennent le relai)
   }
   return hdri;
 });
@@ -416,8 +416,8 @@ const hdriPromise = loadHDRI('industrial_sunset_02', '1k').then(hdri => {
 // Upgrade v0.3 : carrelage beige grand format (sol intérieur),
 // asphalte (sol extérieur), bardage métal (façade), painted_metal_shutter (volets)
 // =========================================================
-// Sol intérieur — carrelage grand format effet pierre beige (style showroom PAAL)
-const tileTexSet = loadTextureSet('large_terrazzo_floor', { res:'1k', repeat:[3, 3] });
+// Sol intérieur — carrelage terrazzo beige (style showroom PAAL)
+const tileTexSet = loadTextureSet('terrazzo_tiles', { res:'1k', repeat:[2.5, 2.5] });
 // Murs intérieurs blancs cassés
 const plasterTexSet = loadTextureSet('painted_plaster_wall', { res:'1k', repeat:[3, 1.5] });
 // Sol extérieur asphalte
@@ -433,9 +433,10 @@ const aluShutterTex = loadTextureSet('painted_metal_shutter', { res:'1k', repeat
 // =========================================================
 const MAT = {
   // Sol carrelage grand format beige (ton showroom PAAL)
-  floor: materialFromSet(tileTexSet, { metalness: 0.05, roughness: 0.55, clearcoat: 0.15, clearcoatRoughness: 0.45 }),
-  // Murs blancs cassés (cloisons sobres)
-  wall: materialFromSet(plasterTexSet, { metalness: 0.0, roughness: 0.95 }),
+  // color fallback beige chaud + envMapIntensity bas pour ne pas absorber la teinte bleue du HDRI
+  floor: materialFromSet(tileTexSet, { color: 0xBCAE8F, metalness: 0.04, roughness: 0.48, clearcoat: 0.18, clearcoatRoughness: 0.4, envMapIntensity: 0.35 }),
+  // Murs blancs cassés (cloisons sobres) — color crème chaud (rappel palette Le battant)
+  wall: materialFromSet(plasterTexSet, { color: 0xF0E8D6, metalness: 0.0, roughness: 0.95, envMapIntensity: 0.45 }),
   // Sol extérieur asphalte (parking devant le bâtiment)
   asphalt: materialFromSet(asphaltTexSet, { metalness: 0.0, roughness: 0.95 }),
   // Bardage façade (anthracite nervuré vertical)
@@ -706,7 +707,13 @@ function makeSpot(x, z, targetX, targetY, targetZ, color = 0xFFEEC0, intensity =
 // Extérieur : 1 sun directional (HDRI + sunlight key)
 // Intérieur : downlights chauds plafond + spots track focalisés sur volets (gérés par makeSpot dans la boucle VOLETS plus bas)
 // =========================================================
-scene.add(new THREE.AmbientLight(0xF5F0E1, 0.06));
+// Ambient chaud pour contrer la froideur du HDRI à l'intérieur du showroom
+scene.add(new THREE.AmbientLight(0xFFE8C8, 0.45));
+
+// Lumière hémisphérique chaude au-dessus du showroom (sol chauffé par les downlights)
+const showroomFill = new THREE.HemisphereLight(0xFFD8A8, 0x8a7a5a, 0.35);
+showroomFill.position.set(0, SR.wallH - 0.5, 0);
+scene.add(showroomFill);
 
 // Sun extérieur
 const sun = new THREE.DirectionalLight(0xFFD8A8, 1.6);
@@ -741,10 +748,10 @@ function makeDownlight(x, z, intensity = 6, color = 0xFFC78A) {
   bulb.rotation.x = Math.PI/2;
   scene.add(bulb);
 }
-// Grille 4×3 de downlights dans le showroom
+// Grille 4×3 de downlights dans le showroom (intensité boostée pour contrer HDRI)
 for (const x of [-6, -2, 2, 6]) {
   for (const z of [-4.5, 0, 4.5]) {
-    makeDownlight(x, z, 4.5);
+    makeDownlight(x, z, 14);
   }
 }
 
