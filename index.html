@@ -95,7 +95,27 @@
   footer { text-align:center; padding:30px 24px 22px; font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:var(--creme-faint); }
   footer a { color:var(--creme-soft); text-decoration:none; border-bottom:1px solid var(--creme-faint); }
 
+  /* PINS — étiquettes ancrées en 3D à côté de chaque volet (suivent leur position 3D) */
+  .volet-pin {
+    position: fixed; top:0; left:0; pointer-events:none;
+    background:rgba(8,8,12,0.88); border:1px solid rgba(245,240,225,0.18);
+    border-left:3px solid var(--rouge); padding:14px 18px; border-radius:2px;
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    width:280px; z-index:4; opacity:0; transition:opacity .35s;
+    will-change:transform, opacity;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+  }
+  .pin-kicker { font-size:9px; letter-spacing:0.3em; text-transform:uppercase; color:var(--creme-faint); margin-bottom:6px; }
+  .pin-title { font-size:22px; font-weight:800; color:var(--creme); margin-bottom:8px; letter-spacing:-0.01em; line-height:1; }
+  .pin-spec { font-size:12px; line-height:1.55; color:var(--creme-soft); }
+
+  /* Cache le texte des sections intermédiaires (les volets ont leurs propres pins 3D) */
+  section[data-room]:not([data-room="0"]) .container { display:none; }
+
   @media (max-width:760px) {
+    .volet-pin { width:220px; padding:10px 14px; }
+    .pin-title { font-size:18px; }
+    .pin-spec { font-size:11px; }
     #progress { right:12px; padding:10px 6px; gap:8px; }
     #brand .b1 { font-size:22px; }
     section.right .container, section.left .container { margin-left:auto; margin-right:auto; text-align:center; }
@@ -1093,14 +1113,28 @@ const VOLETS = [
   { id: 7, name: 'Séparatif balcon',    kicker: '08 / 08', pos: [ 7, 0.6,  5.2], color: 0xC5322D, factory: () => makeSeparatif(MAT.aluRouge), spotColor: 0xFFCFCF },
 ];
 
-VOLETS.forEach(v => {
+// Specs textuelles pour les pins 3D (HTML labels ancrés à chaque volet)
+const VOLET_TEXTS = [
+  { kicker: 'Modèle 01 / 08', title: 'Battant à gond',      spec: 'Le grand classique. Charnières apparentes, ouverture extérieure pleine, robustesse éprouvée.' },
+  { kicker: 'Modèle 02 / 08', title: 'Battant à dormant',   spec: 'Encastré dans le tableau. Étanchéité EPDM périphérique. Idéal rénovation patrimoine.' },
+  { kicker: 'Modèle 03 / 08', title: 'Pliant',              spec: 'L\'accordéon. 4 vantaux articulés qui se replient sur le côté pour libérer la baie.' },
+  { kicker: 'Modèle 04 / 08', title: 'Pliant suspendu',     spec: 'Pas de seuil au sol. Tout en suspension sur rail haut renforcé. Accessibilité PMR.' },
+  { kicker: 'Modèle 05 / 08', title: 'Coulissant suspendu', spec: 'Glisse en façade sans débord. Glissière laiton anti-corrosion, vantaux superposables 2 ou 3 voies.' },
+  { kicker: 'Modèle 06 / 08', title: 'Brise-vue',           spec: 'Lamelles fixes inclinées 45°. Bloque la vue depuis l\'extérieur, laisse passer lumière et air.' },
+  { kicker: 'Modèle 07 / 08', title: 'Brise-soleil',        spec: 'Lamelles orientables à la corde. Module la lumière selon la saison, façade sud/véranda.' },
+  { kicker: 'Modèle 08 / 08', title: 'Séparatif balcon',    spec: 'Panneau plein opaque 2 m. Coupe la vue entre balcons voisins, résistance vent ≥ 120 km/h.' },
+];
+
+// Pins HTML — ancrés à la 3D, suivent leur position projetée à chaque frame
+const PINS = [];
+VOLETS.forEach((v, i) => {
   // Piédestal
   const ped = makePedestal(`${v.kicker.split(' / ')[0]} ${v.name}`, v.id < 4 ? 0x8FAF89 : 0xC5322D);
   ped.position.set(v.pos[0], 0, v.pos[2]);
   ped.rotation.y = v.pos[2] < 0 ? Math.PI : 0;
   scene.add(ped);
 
-  // PANNEAU D'EXPOSITION (au lieu du modèle 3D procédural)
+  // PANNEAU D'EXPOSITION
   const board = makeDisplayBoard(v.name, v.kicker, v.color);
   board.position.set(v.pos[0], 1.65, v.pos[2] + (v.pos[2] < 0 ? 0.15 : -0.15));
   board.rotation.y = v.pos[2] < 0 ? 0 : Math.PI;
@@ -1108,7 +1142,39 @@ VOLETS.forEach(v => {
 
   // Spot dédié focalisé sur le panneau
   makeSpot(v.pos[0], v.pos[2] + (v.pos[2] < 0 ? 2.0 : -2.0), v.pos[0], 1.8, v.pos[2], v.spotColor, 18);
+
+  // Pin HTML 3D — anchored juste à droite et en bas du board
+  const t = VOLET_TEXTS[i];
+  const div = document.createElement('div');
+  div.className = 'volet-pin';
+  div.innerHTML = `<div class="pin-kicker">${t.kicker}</div><div class="pin-title">${t.title}</div><div class="pin-spec">${t.spec}</div>`;
+  document.body.appendChild(div);
+  // Ancrage en 3D : à droite (+x) et légèrement plus bas que le centre du board
+  const anchor = new THREE.Vector3(v.pos[0] + 1.1, 1.1, v.pos[2] + (v.pos[2] < 0 ? 0.2 : -0.2));
+  PINS.push({ div, anchor });
 });
+
+// Update positions des pins HTML à chaque frame (projection 3D → écran)
+const _pinProj = new THREE.Vector3();
+function updatePins() {
+  for (const pin of PINS) {
+    _pinProj.copy(pin.anchor).project(camera);
+    const inFront = _pinProj.z > -1 && _pinProj.z < 1;
+    const inFrame = Math.abs(_pinProj.x) < 1.15 && Math.abs(_pinProj.y) < 1.15;
+    const dist = camera.position.distanceTo(pin.anchor);
+    // Fade : pleine opacité jusqu'à 3.5m, fade out linéaire jusqu'à 4.5m
+    // (camera-to-own-pin = 3.43m ✓ ; camera-to-neighbor-volet-pin = 4.64m → 0% ✓)
+    const fade = dist < 3.5 ? 1 : Math.max(0, 1 - (dist - 3.5));
+    if (inFront && inFrame && fade > 0.05) {
+      const x = (_pinProj.x * 0.5 + 0.5) * innerWidth;
+      const y = (-_pinProj.y * 0.5 + 0.5) * innerHeight;
+      pin.div.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+      pin.div.style.opacity = fade;
+    } else {
+      pin.div.style.opacity = 0;
+    }
+  }
+}
 
 // =========================================================
 // HERO VOLET (à l'entrée, façade sud du showroom)
@@ -1157,44 +1223,59 @@ scene.add(doorBeam);
 // 3-10: each volet
 // 11: outro
 // =========================================================
-// PARCOURS v0.6 — retours Herman cumulés :
-// « les descriptions s'affichent trop tôt » → WPs alignés sur les CENTRES de section HTML
-// « on passe trop proche des derniers volets, on voit rien » → distance 1.7m → 2.8m
-//   (caméra recule de z=±3.5 à z=±2.4 → on voit la totalité du board H=2.2m + cadre)
+// PARCOURS v0.7 — 2 curves séparées (hero approach + showroom tour)
+// FIX CRITIQUE: l'ancien path en ligne droite (0,2.4,12)→(-7,1.65,-2.4) traversait le mur
+// (à z=7, x=-2.4 → hors porte qui est à x∈[-1.5, +1.5]).
+// SOLUTION: phase hero CENTRÉE sur l'axe de la porte (x=0) jusqu'à passer le mur sud.
 //
-// 10 WPs (1 par section HTML : hero + 8 volets + outro), mappés au centre de chaque section
-// VOLETS dans l'ordre HTML strict :
-//   s1 V0 Battant à gond (NW)        s5 V4 Coulissant suspendu (SW)
-//   s2 V1 Battant à dormant          s6 V5 Brise-vue
-//   s3 V2 Pliant                     s7 V6 Brise-soleil
-//   s4 V3 Pliant suspendu (NE)       s8 V7 Séparatif balcon (SE)
-const WP = [
-  // s0 hero — face au bâtiment (camera reste ici scrollT 0 → 0.05, puis transit vers V0)
-  { p:[0, 2.4, 12],         l:[0, 2.1, 7] },          // 0 — hero
-  // ─── Mur NORD (z=-5.2) — ouest → est (s1 à s4) ───
-  { p:[-7, 1.65, -2.4],     l:[-7, 1.65, -5.2] },     // 1 — s1 V0 Battant à gond (NW)
-  { p:[-2.4, 1.65, -2.4],   l:[-2.4, 1.65, -5.2] },   // 2 — s2 V1 Battant à dormant
-  { p:[ 2.4, 1.65, -2.4],   l:[ 2.4, 1.65, -5.2] },   // 3 — s3 V2 Pliant
-  { p:[ 7, 1.65, -2.4],     l:[ 7, 1.65, -5.2] },     // 4 — s4 V3 Pliant suspendu (NE)
-  // ─── Mur SUD (z=+5.2) — ouest → est (s5 à s8, même direction visuelle, symétrique) ───
-  { p:[-7, 1.65,  2.4],     l:[-7, 1.65,  5.2] },     // 5 — s5 V4 Coulissant suspendu (SW)
-  { p:[-2.4, 1.65,  2.4],   l:[-2.4, 1.65,  5.2] },   // 6 — s6 V5 Brise-vue
-  { p:[ 2.4, 1.65,  2.4],   l:[ 2.4, 1.65,  5.2] },   // 7 — s7 V6 Brise-soleil
-  { p:[ 7, 1.65,  2.4],     l:[ 7, 1.65,  5.2] },     // 8 — s8 V7 Séparatif balcon (SE)
-  // s9 outro — vue plongeante depuis le centre du plafond
-  { p:[0, 5.5, 0],          l:[0, 0.4, 0] },          // 9 — outro overview
+// Distance caméra-volet: 1.8m de marge interne (z=±1.8 du centre, volets à ±5.2) → 3.4m distance
+// → FOV 46° vue verticale = 2*3.4*tan(23°) = 2.89m → couvre board H=2.2 + cadre 0.3 = 2.5m ✓
+//
+// HERO (scrollT 0 → 0.1) : 4 WPs, tous à x=0 → garantit passage centré dans la porte
+// TOUR (scrollT 0.1 → 1.0) : 9 WPs (V0..V7 + outro), volets à ±1.8 de la centerline
+
+const HERO_WP = [
+  { p:[0, 2.4, 13],         l:[0, 2.2, 8] },          // 0 — face au bâtiment, recul
+  { p:[0, 2.0, 9.5],        l:[0, 1.85, 6] },         // 1 — on s'approche
+  { p:[0, 1.65, 5.5],       l:[0, 1.55, 1.5] },       // 2 — passe la porte (mur sud à z=7 traversé à x∈[0, +0.5] ✓ dans door [-1.5, 1.5])
+  // HERO[3] = TOUR[0] (V0 NW) → continuité parfaite à scrollT=0.1 (pos ET look identiques)
+  { p:[-7, 1.65, -1.8],     l:[-7, 1.65, -5.05] },    // 3 — arrive à V0 (= TOUR[0])
 ];
 
-// alignedT : map scrollT → curve param pour que WP[k] coïncide avec le CENTRE de la section HTML k
-// (chaque section HTML couvre 1/10 du scroll, centrée à (k+0.5)/10 ; WP[k] doit y être placé)
-function alignedT(scrollT) {
-  const s = Math.min(9, Math.max(0, scrollT * 10 - 0.5));  // 0 → 9 (index WP)
-  return s / 9;  // normalisé pour getPoint
-}
+const TOUR_WP = [
+  // ─── Mur NORD (z=-5.2) ouest → est ───
+  { p:[-7, 1.65, -1.8],     l:[-7, 1.65, -5.05] },    // 0 → s1 V0 Battant à gond (NW)
+  { p:[-2.4, 1.65, -1.8],   l:[-2.4, 1.65, -5.05] },  // 1 → s2 V1 Battant à dormant
+  { p:[ 2.4, 1.65, -1.8],   l:[ 2.4, 1.65, -5.05] },  // 2 → s3 V2 Pliant
+  { p:[ 7, 1.65, -1.8],     l:[ 7, 1.65, -5.05] },    // 3 → s4 V3 Pliant suspendu (NE)
+  // ─── Mur SUD (z=+5.2) ouest → est ───
+  { p:[-7, 1.65,  1.8],     l:[-7, 1.65,  5.05] },    // 4 → s5 V4 Coulissant suspendu (SW)
+  { p:[-2.4, 1.65,  1.8],   l:[-2.4, 1.65,  5.05] },  // 5 → s6 V5 Brise-vue
+  { p:[ 2.4, 1.65,  1.8],   l:[ 2.4, 1.65,  5.05] },  // 6 → s7 V6 Brise-soleil
+  { p:[ 7, 1.65,  1.8],     l:[ 7, 1.65,  5.05] },    // 7 → s8 V7 Séparatif balcon (SE)
+  // Outro
+  { p:[0, 5.5, 0],          l:[0, 0.4, 0] },          // 8 → s9 outro vue plongeante
+];
 
-// Tension 0.5 — courbes douces (les WPs sont déjà bien placés, pas besoin de courbure serrée)
-const posCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.5);
-const lookCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.5);
+const heroPosCurve = new THREE.CatmullRomCurve3(HERO_WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.5);
+const heroLookCurve = new THREE.CatmullRomCurve3(HERO_WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.5);
+const tourPosCurve = new THREE.CatmullRomCurve3(TOUR_WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.5);
+const tourLookCurve = new THREE.CatmullRomCurve3(TOUR_WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.5);
+
+// Sync HTML→3D :
+// - scrollT 0 → 0.1 : phase HERO (s0 hero HTML, "8 volets. Un showroom.")
+// - scrollT (k+0.5)/10 (k=1..8) : caméra AU volet V(k-1) (centre de section s_k)
+// - scrollT 0.95 : outro
+function getCameraAt(scrollT) {
+  if (scrollT < 0.1) {
+    const t = scrollT / 0.1;  // 0 → 1
+    return { pos: heroPosCurve.getPoint(t), look: heroLookCurve.getPoint(t) };
+  }
+  // TOUR : 9 WPs (V0..V7 + outro). Caméra à TOUR_WP[k] quand scrollT = (k+1.5)/10 (centre s_{k+1}).
+  // Donc à scrollT = 0.15 : tTour = 0 (V0) ; scrollT = 0.85 : tTour = 7/8 (V7) ; scrollT = 0.95 : tTour = 1 (outro)
+  const tTour = Math.min(8, Math.max(0, scrollT * 10 - 1.5)) / 8;
+  return { pos: tourPosCurve.getPoint(tTour), look: tourLookCurve.getPoint(tTour) };
+}
 
 // =========================================================
 // SCROLL + LENIS
@@ -1255,12 +1336,14 @@ function loop() {
   heroGlow.material.emissiveIntensity = 0.55 + openEased * 0.6;
   doorBeam.intensity = openEased * 14;  // halo qui sort du bâtiment
 
-  // Caméra suit le path — alignedT() sync les WPs avec les centres des sections HTML
-  // getPoint (pas getPointAt) : interpolation linéaire par segment, WP[k] pile à t = k/(N-1)
-  const tC = alignedT(t);
-  camera.position.copy(posCurve.getPoint(tC));
-  lookV.copy(lookCurve.getPoint(tC));
+  // Caméra suit le path en 2 phases (hero approche + showroom tour)
+  const cam = getCameraAt(t);
+  camera.position.copy(cam.pos);
+  lookV.copy(cam.look);
   camera.lookAt(lookV);
+
+  // MAJ pins 3D
+  updatePins();
 
   updateHUD();
   composer.render();
