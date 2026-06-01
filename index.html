@@ -594,11 +594,12 @@ function makeColumnIPN(h) {
   g.add(fA); g.add(fB); g.add(web);
   return castAll(g);
 }
-// Colonnes positionnées aux 4 coins SEULEMENT (libère l'axe central + lignes de vue depuis le centre vers les volets)
-// Pushed vers les murs (x=±6.5, z=±4.5) pour ne pas couper la vue
+// Colonnes IPN repoussées aux EXTREMITES (collées aux 4 coins de la pièce)
+// Plus aucune colonne devant les volets ni sur le passage caméra (qui longe les volets à z=±3.5)
+// Retour Herman v0.4 : « il y a des poteaux devant les volets »
 const COL_POSITIONS = [
-  [-6.5, -4.5], [ 6.5, -4.5],
-  [-6.5,  4.5], [ 6.5,  4.5],
+  [-9.4, -6.4], [ 9.4, -6.4],
+  [-9.4,  6.4], [ 9.4,  6.4],
 ];
 COL_POSITIONS.forEach(([x, z]) => {
   const col = makeColumnIPN(SR.wallH - 0.4);
@@ -1156,40 +1157,41 @@ scene.add(doorBeam);
 // 3-10: each volet
 // 11: outro
 // =========================================================
-// PARCOURS v0.4 — retour Herman : « on rentre tout droit, on va au milieu, ensuite on fait le tour »
-// 1. Approche frontale du bâtiment (z=12 → z=5, axe central)
-// 2. Au centre du showroom (0, 1.65, 0), la caméra orbite légèrement (rayon 0.6m) et tourne sur elle-même
-// 3. Le lookAt cycle sur les 8 volets dans l'ordre horaire : N-W → N-E → S-E → S-W
-// 4. Outro overview
-// Position toujours dans un cercle de rayon ~0.6m autour du centre — pas de collision avec colonnes (aux 4 coins x=±6.5, z=±4.5)
-const CENTER_Y = 1.65;
-// Petite orbite circulaire (rayon 0.6m) — la caméra micro-déplace pour donner du mouvement organique
-function centerOrbit(angleRad) {
-  const r = 0.6;
-  return [Math.sin(angleRad) * r, CENTER_Y, Math.cos(angleRad) * r];
-}
-
+// PARCOURS v0.5 — retours Herman cumulés :
+// « on rentre tout droit, on va au milieu, ensuite on fait le tour »
+// « il faut quand même passer devant chaque volet »
+// « il y a des poteaux devant les volets » → colonnes repoussées aux extrémités
+//
+// 1. Approche frontale du bâtiment (z=12 → z=5)
+// 2. Pause au centre du showroom (point de vue d'ensemble)
+// 3. Tour PROCHE de chaque volet : caméra à ~1.7m de la cloison, regardant pile le volet
+// 4. Ordre horaire : NW → N → N → NE → SE → S → S → SW
+// 5. Outro vue plongeante depuis le plafond
+//
+// Trajectoires safe : pas de collision (colonnes désormais aux coins extrêmes ±9.4, ±6.4)
 const WP = [
   { p:[0, 2.4, 12],         l:[0, 2.1, 8] },          // 0 — face au bâtiment (resserré)
   { p:[0, 1.85, 9.0],       l:[0, 1.6, 6] },          // 1 — devant le volet porte (qui s'ouvre)
-  { p:[0, 1.7,  3.5],       l:[0, 1.5, 0] },          // 2 — tout droit, on entre dans le showroom
-  { p:[0, 1.65, 0.5],       l:[0, 1.5, -3] },         // 3 — au milieu, regard vers le nord (juste avant le tour)
-  // ═══════════════ TOUR DU CENTRE — 8 volets dans l'ordre horaire ═══════════════
-  { p:centerOrbit(-2.4),    l:[-7, 1.3, -5.5] },      // 4 — V0 battant à gond (NW)
-  { p:centerOrbit(-1.9),    l:[-3, 1.3, -5.5] },      // 5 — V1 battant dormant (N mid-W)
-  { p:centerOrbit(-1.4),    l:[ 3, 1.3, -5.5] },      // 6 — V2 pliant (N mid-E)
-  { p:centerOrbit(-0.7),    l:[ 7, 1.3, -5.5] },      // 7 — V3 pliant suspendu (NE)
-  { p:centerOrbit( 0.7),    l:[ 7, 1.3,  5.5] },      // 8 — V4 coulissant suspendu (SE)
-  { p:centerOrbit( 1.4),    l:[ 3, 1.3,  5.5] },      // 9 — V6 brise-soleil (S mid-E)
-  { p:centerOrbit( 1.9),    l:[-3, 1.3,  5.5] },      // 10 — V5 brise-vue (S mid-W)
-  { p:centerOrbit( 2.4),    l:[-7, 1.3,  5.5] },      // 11 — V7 séparatif balcon (SW)
-  // ═══════════════ Outro : vue plongeante du showroom ═══════════════
-  { p:[0, 5.8, 0.5],        l:[0, 0.3, 0] },          // 12 — overview vertical, regard plongeant
+  { p:[0, 1.7,  4.0],       l:[0, 1.5, 0] },          // 2 — tout droit, on entre dans le showroom
+  { p:[0, 1.65, 0],         l:[0, 1.55, -3] },        // 3 — AU MILIEU, regard vers le nord (vue d'ensemble)
+  // ═══════════════ TOUR — passage devant chaque volet (caméra à ~1.7m du board) ═══════════════
+  // ── Mur NORD (z=-5.2) — on longe d'ouest en est ──
+  { p:[-7, 1.65, -3.5],     l:[-7, 1.65, -5.2] },     // 4 — V0 battant à gond (NW) — pile en face
+  { p:[-2.4, 1.65, -3.5],   l:[-2.4, 1.65, -5.2] },   // 5 — V1 battant dormant (N mid-W)
+  { p:[ 2.4, 1.65, -3.5],   l:[ 2.4, 1.65, -5.2] },   // 6 — V2 pliant (N mid-E)
+  { p:[ 7, 1.65, -3.5],     l:[ 7, 1.65, -5.2] },     // 7 — V3 pliant suspendu (NE)
+  // ── Mur SUD (z=+5.2) — on longe d'est en ouest (symétrie) ──
+  { p:[ 7, 1.65,  3.5],     l:[ 7, 1.65,  5.2] },     // 8 — V4 coulissant suspendu (SE)
+  { p:[ 2.4, 1.65,  3.5],   l:[ 2.4, 1.65,  5.2] },   // 9 — V6 brise-soleil (S mid-E)
+  { p:[-2.4, 1.65,  3.5],   l:[-2.4, 1.65,  5.2] },   // 10 — V5 brise-vue (S mid-W)
+  { p:[-7, 1.65,  3.5],     l:[-7, 1.65,  5.2] },     // 11 — V7 séparatif balcon (SW)
+  // ═══════════════ Outro vue plongeante depuis le plafond ═══════════════
+  { p:[0, 5.8, 0.5],        l:[0, 0.3, 0] },          // 12 — overview vertical
 ];
 
-// Tension 0.7 — équilibre entre fluidité et fidélité aux waypoints (les WPs centrés sont proches, courbe douce)
-const posCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.7);
-const lookCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.7);
+// Tension 0.85 — courbe serrée pour ne pas s'éloigner des WPs (passage net devant chaque volet)
+const posCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.p)), false, 'centripetal', 0.85);
+const lookCurve = new THREE.CatmullRomCurve3(WP.map(w => new THREE.Vector3(...w.l)), false, 'centripetal', 0.85);
 
 // =========================================================
 // SCROLL + LENIS
