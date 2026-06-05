@@ -938,19 +938,6 @@ function makePliant(aluMat, suspended = false) {
     const pivot = new THREE.Group();
     panel.position.x = W/2;
     pivot.add(panel);
-    // Charnières laiton à l'articulation avec le vantail suivant : pattes horizontales qui CHEVAUCHENT les 2 panneaux
-    // (au bord x=W = la jonction ; débordent de part et d'autre → relient visiblement les vantaux, comme la photo)
-    if (i < nPanels - 1) {
-      for (let k = 0; k < 3; k++) {
-        const y = -H/2 + 0.35 + k * (H - 0.7) / 2;
-        const strap = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.055, 0.018), brass);
-        strap.position.set(W, y, 0.026);  // proue devant les panneaux, à cheval sur la jonction
-        pivot.add(strap);
-        const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.085, 10), brass);
-        pin.position.set(W, y, 0.034);
-        pivot.add(pin);
-      }
-    }
     // Suspendu : petite roulette en tête de chaque vantail (solidaire du pivot)
     if (suspended) {
       const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.025, 14), MAT.hardware);
@@ -961,6 +948,27 @@ function makePliant(aluMat, suspended = false) {
     }
     g.add(pivot);
     pivots.push(pivot);
+  }
+
+  // Vraies charnières laiton à 2 LAMES par jonction : une lame fixée sur chaque panneau (donc solidaire de son pivot),
+  // reliées par un axe à l'arête commune (x=W de pivot i = x=0 de pivot i+1). Quand ça se plie, chaque lame suit
+  // son panneau → la charnière s'articule en V (elle se PLIE), comme une vraie. 3 charnières par jonction (haut/milieu/bas).
+  for (let i = 0; i < nPanels - 1; i++) {
+    for (let k = 0; k < 3; k++) {
+      const y = -H/2 + 0.35 + k * (H - 0.7) / 2;
+      // Lame sur le panneau i (près de son bord droit x=W), pointe vers l'intérieur
+      const leafA = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.012), brass);
+      leafA.position.set(W - 0.045, y, 0.026);
+      pivots[i].add(leafA);
+      // Lame sur le panneau i+1 (près de son bord gauche x=0), pointe vers l'intérieur
+      const leafB = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.012), brass);
+      leafB.position.set(0.045, y, 0.026);
+      pivots[i + 1].add(leafB);
+      // Axe (knuckle) à l'arête commune — solidaire du panneau i
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.075, 10), brass);
+      pin.position.set(W, y, 0.03);
+      pivots[i].add(pin);
+    }
   }
 
   // Suspendu : rail haut FIXE qui court au-dessus (pas de rail au sol → c'est la signature du modèle)
