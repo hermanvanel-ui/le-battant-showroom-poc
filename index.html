@@ -927,7 +927,7 @@ function makeBattant(aluMat, openAngle = 0.6) {
 // === 2) PLIANT (4 panneaux articulés en accordéon) ===
 function makePliant(aluMat, suspended = false) {
   const g = new THREE.Group();
-  const W = 0.32, H = 1.9;
+  const W = 0.34, H = 1.9;  // 4 panneaux ≈ 1.36 → couvre l'ouverture (1.35) à plat = fermé
   const nPanels = 4;
   const pivots = [];
   const brass = new THREE.MeshPhysicalMaterial({ color: 0xC9A268, metalness: 0.9, roughness: 0.35, clearcoat: 0.5 });
@@ -998,9 +998,10 @@ function makePliant(aluMat, suspended = false) {
       pos.z += W * Math.sin(ang);
     }
   }
-  const MAXF = 0.95;
+  // t=0 = déplié À PLAT (fermé, couvre l'ouverture) ; t=1 = replié ~90° → vantaux empilés sur un côté (ouvert)
+  const MAXF = 1.45;
   g.userData.setOpen = (t) => layout(t * MAXF);
-  g.userData.openDefault = 0.6;  // plié au repos comme la photo de réf (accordéon en W) → on voit les charnières sur l'intérieur des plis
+  g.userData.openDefault = 0.38;  // repos : partiellement ouvert (accordéon visible, charnières intérieures), comme la photo
   g.userData.setOpen(g.userData.openDefault);
   return g;
 }
