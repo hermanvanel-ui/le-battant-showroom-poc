@@ -433,7 +433,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.85;  // baissé pour lisibilité des textes HTML (retour Herman 2026-06-01)
+renderer.toneMappingExposure = 0.9;  // M2 : léger lift premium (0.85→0.9) — alu mat, plus de risque LED ; textes HTML ont leur propre fond sombre
 wrap.appendChild(renderer.domElement);
 
 const renderPass = new RenderPass(scene, camera);
@@ -784,8 +784,9 @@ function makeSpot(x, z, targetX, targetY, targetZ, color = 0xFFEEC0, intensity =
   const s = new THREE.SpotLight(color, intensity, 8, Math.PI/4.5, 0.55, 1.5);
   s.position.set(x, SR.wallH - 0.2, z);
   s.castShadow = true;
-  s.shadow.mapSize.set(1024, 1024);
+  s.shadow.mapSize.set(2048, 2048);  // M2 : 1024→2048, ombres plus nettes sur les volets
   s.shadow.bias = -0.0001;
+  s.shadow.radius = 3;  // bord d'ombre légèrement adouci (premium)
   const t = new THREE.Object3D();
   t.position.set(targetX, targetY, targetZ);
   scene.add(t);
