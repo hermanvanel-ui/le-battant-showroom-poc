@@ -938,12 +938,17 @@ function makePliant(aluMat, suspended = false) {
     const pivot = new THREE.Group();
     panel.position.x = W/2;
     pivot.add(panel);
-    // Charnières laiton à l'articulation avec le vantail suivant (liaison accordéon) — au bord x=W, solidaires du pivot
+    // Charnières laiton à l'articulation avec le vantail suivant : pattes horizontales qui CHEVAUCHENT les 2 panneaux
+    // (au bord x=W = la jonction ; débordent de part et d'autre → relient visiblement les vantaux, comme la photo)
     if (i < nPanels - 1) {
-      for (let k = 0; k < 4; k++) {
-        const knuckle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.12, 10), brass);
-        knuckle.position.set(W, -H/2 + 0.25 + k * (H - 0.5) / 3, 0.018);
-        pivot.add(knuckle);
+      for (let k = 0; k < 3; k++) {
+        const y = -H/2 + 0.35 + k * (H - 0.7) / 2;
+        const strap = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.055, 0.018), brass);
+        strap.position.set(W, y, 0.026);  // proue devant les panneaux, à cheval sur la jonction
+        pivot.add(strap);
+        const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.085, 10), brass);
+        pin.position.set(W, y, 0.034);
+        pivot.add(pin);
       }
     }
     // Suspendu : petite roulette en tête de chaque vantail (solidaire du pivot)
@@ -983,7 +988,7 @@ function makePliant(aluMat, suspended = false) {
   }
   const MAXF = 0.95;
   g.userData.setOpen = (t) => layout(t * MAXF);
-  g.userData.openDefault = 0.06;  // quasi-déplié au repos → panneaux jointifs (reliés), pas d'espace ; l'accordéon se voit à l'animation
+  g.userData.openDefault = 0.0;  // parfaitement déplié au repos → panneaux coplanaires jointifs (aucun pli sombre), reliés par les pattes laiton
   g.userData.setOpen(g.userData.openDefault);
   return g;
 }
