@@ -1426,9 +1426,9 @@ function updatePins() {
     const inFront = _pinProj.z > -1 && _pinProj.z < 1;
     const inFrame = Math.abs(_pinProj.x) < 1.15 && Math.abs(_pinProj.y) < 1.15;
     const dist = camera.position.distanceTo(pin.anchor);
-    // Fade : pleine opacité jusqu'à 3.5m, fade out linéaire jusqu'à 4.5m
-    // (camera-to-own-pin = 3.43m ✓ ; camera-to-neighbor-volet-pin = 4.64m → 0% ✓)
-    const fade = dist < 3.5 ? 1 : Math.max(0, 1 - (dist - 3.5));
+    // Fade : pleine opacité jusqu'à 4.7m, fade out linéaire jusqu'à 5.7m
+    // (recul caméra v0.17 : camera-to-own-pin ≈ 4.35m ✓ ; camera-to-neighbor-pin ≈ 6.3m → 0% ✓)
+    const fade = dist < 4.7 ? 1 : Math.max(0, 1 - (dist - 4.7));
     if (inFront && inFrame && fade > 0.05) {
       const x = (_pinProj.x * 0.5 + 0.5) * innerWidth;
       const y = (-_pinProj.y * 0.5 + 0.5) * innerHeight;
@@ -1544,24 +1544,26 @@ const HERO_WP = [
   // HERO[3] = TOUR[0] (V0 NW) → continuité parfaite à scrollT=0.1 (pos ET look identiques)
   // ⚠ Centré sur le VOLET (world x=-7.45), pas sur le centre de l'exhibit (x=-7)
   // car volet local x=-0.45 dans exhibit. Image sur la droite à world x=-6.40.
-  { p:[-7.45, 1.65, -1.8],  l:[-7.45, 1.65, -5.05] }, // 3 — arrive à V0 (= TOUR[0])
+  { p:[-7.45, 1.65, -0.8],  l:[-7.45, 1.65, -5.05] }, // 3 — arrive à V0 (= TOUR[0])
 ];
 
+// Recul caméra v0.17 (retour Herman "on est trop proche") : z ±1.8 → ±0.8
+// → distance caméra-volet ~3.25m → ~4.35m, on voit le volet entier + sa photo de réf
 const TOUR_WP = [
   // ─── Mur NORD (z=-5.2) ouest → est ───
   // V0 centré sur le VOLET (world x=-7.45), pas sur l'exhibit (x=-7). Image visible à droite.
-  { p:[-7.45, 1.65, -1.8],  l:[-7.45, 1.65, -5.05] }, // 0 → s1 V0 Battant à gond (NW)
-  { p:[-2.4, 1.65, -1.8],   l:[-2.4, 1.65, -5.05] },  // 1 → s2 V1 Battant à dormant
-  { p:[ 2.4, 1.65, -1.8],   l:[ 2.4, 1.65, -5.05] },  // 2 → s3 V2 Pliant
-  { p:[ 7, 1.65, -1.8],     l:[ 7, 1.65, -5.05] },    // 3 → s4 V3 Pliant suspendu (NE)
+  { p:[-7.45, 1.65, -0.8],  l:[-7.45, 1.65, -5.05] }, // 0 → s1 V0 Battant à gond (NW)
+  { p:[-2.4, 1.65, -0.8],   l:[-2.4, 1.65, -5.05] },  // 1 → s2 V1 Battant à dormant
+  { p:[ 2.4, 1.65, -0.8],   l:[ 2.4, 1.65, -5.05] },  // 2 → s3 V2 Pliant
+  { p:[ 7, 1.65, -0.8],     l:[ 7, 1.65, -5.05] },    // 3 → s4 V3 Pliant suspendu (NE)
   // 🔁 CENTER TRANSIT — caméra à hauteur d'œil au centre, regarde au sud (prépare V4)
   // Évite le cut visuel : trajectoire en C-arc à travers le centre + rotation lookAt graduelle
   { p:[0, 1.65, 0],         l:[0, 1.55, 4] },          // 4 → transit (scrollT 0.50, entre s4 et s5)
   // ─── Mur SUD (z=+5.2) ouest → est ───
-  { p:[-7, 1.65,  1.8],     l:[-7, 1.65,  5.05] },    // 5 → s5 V4 Coulissant suspendu (SW)
-  { p:[-2.4, 1.65,  1.8],   l:[-2.4, 1.65,  5.05] },  // 6 → s6 V5 Brise-vue
-  { p:[ 2.4, 1.65,  1.8],   l:[ 2.4, 1.65,  5.05] },  // 7 → s7 V6 Brise-soleil
-  { p:[ 7, 1.65,  1.8],     l:[ 7, 1.65,  5.05] },    // 8 → s8 V7 Séparatif balcon (SE)
+  { p:[-7, 1.65,  0.8],     l:[-7, 1.65,  5.05] },    // 5 → s5 V4 Coulissant suspendu (SW)
+  { p:[-2.4, 1.65,  0.8],   l:[-2.4, 1.65,  5.05] },  // 6 → s6 V5 Brise-vue
+  { p:[ 2.4, 1.65,  0.8],   l:[ 2.4, 1.65,  5.05] },  // 7 → s7 V6 Brise-soleil
+  { p:[ 7, 1.65,  0.8],     l:[ 7, 1.65,  5.05] },    // 8 → s8 V7 Séparatif balcon (SE)
   // Outro
   { p:[0, 5.5, 0],          l:[0, 0.4, 0] },          // 9 → s9 outro vue plongeante
 ];
