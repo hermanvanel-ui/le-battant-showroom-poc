@@ -1012,20 +1012,21 @@ function makeCoulissant(aluMat) {
   }
   g.add(panel);
 
-  // Rail haut industriel FIXE (le panneau glisse dessous)
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(PW * 2.3, 0.05, 0.06), MAT.hardware);
-  rail.position.set(-PW * 0.45, PH/2 + 0.14, -0.03);
+  // Rail haut industriel FIXE (le panneau glisse dessous) — couvre l'ouverture + la zone de mur à droite
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(PW * 2.1, 0.05, 0.06), MAT.hardware);
+  rail.position.set(PW * 0.45, PH/2 + 0.14, -0.03);
   g.add(rail);
-  // Supports du rail
-  for (const sx of [-PW * 1.4, PW * 0.6]) {
+  // Supports du rail (près des bords du fragment de mur)
+  for (const sx of [-PW * 0.5, PW * 1.4]) {
     const sup = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.06), MAT.hardware);
     sup.position.set(sx, PH/2 + 0.20, -0.03); g.add(sup);
   }
 
-  // Animation : le panneau glisse vers la gauche pour dégager l'ouverture
-  const closedX = 0, openX = -PW * 0.92;
+  // Animation : le panneau glisse vers la DROITE (là où il y a du mur) pour dégager l'ouverture
+  // Borné pour rester sur le fragment de mur (l'ouverture est décalée à gauche → mur dispo à droite)
+  const closedX = 0, openX = PW * 1.0;
   g.userData.setOpen = (t) => { panel.position.x = closedX + (openX - closedX) * t; };
-  g.userData.openDefault = 0.1;  // légèrement entrouvert (rendu d'expo)
+  g.userData.openDefault = 0.12;  // légèrement entrouvert (rendu d'expo)
   g.userData.setOpen(g.userData.openDefault);
   return castAll(g);
 }
@@ -1270,7 +1271,8 @@ function makeVoletEnPose(aluMat, imageUrl, factory, opts = {}) {
 
   // --- 3. Volet du BON TYPE (factory) monté dans l'ouverture ---
   const volet = (typeof factory === 'function') ? factory() : makeBattant(aluMat, 1.0);
-  volet.position.set(VOLET_X, winCenterY, WF_D/2 + 0.06);
+  // z = devant le jambage (jambage front ≈ WF_D/2+0.06) → +0.13 pour que les vantaux ne clippent pas le cadre en pivotant
+  volet.position.set(VOLET_X, winCenterY, WF_D/2 + 0.13);
   g.add(volet);
   // Expose la commande d'animation du volet au groupe exhibit (pour le bouton "Voir l'animation")
   g.userData.setOpen = volet.userData.setOpen;
