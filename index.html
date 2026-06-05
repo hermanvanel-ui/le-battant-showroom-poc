@@ -964,27 +964,50 @@ function makePliant(aluMat) {
   return g;
 }
 
-// === 3) COULISSANT (2 panneaux décalés latéralement) ===
+// === 3) COULISSANT SUSPENDU (1 panneau à lamelles VERTICALES, type porte de grange alu) ===
 function makeCoulissant(aluMat) {
   const g = new THREE.Group();
-  const W = 0.7, H = 1.9;
-  const p1 = makeBattantPanel(aluMat, true); p1.position.set(-W/2 - 0.05, 0, 0);
-  const p2 = makeBattantPanel(aluMat, false); p2.position.set(W/2 + 0.05, 0, 0.04);
-  g.add(p1); g.add(p2);
-  // Animation : le vantail droit glisse pour se superposer au gauche — t=0 fermé (couvre) → t=1 ouvert (dégage)
-  const closedX = W/2 + 0.05, openX = -W/2 + 0.02;
-  g.userData.setOpen = (t) => { p2.position.x = closedX + (openX - closedX) * t; };
-  g.userData.openDefault = 0;
-  // Rail haut (suspension)
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(W * 3, 0.06, 0.08), MAT.hardware);
-  rail.position.set(0, H/2 + 0.06, 0);
-  g.add(rail);
-  // Suspentes
-  for (const x of [-W * 0.6, W * 0.6]) {
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 8), MAT.hardware);
-    stem.position.set(x, H/2 + 0.02, 0);
-    g.add(stem);
+  const PW = 1.0, PH = 1.85, fw = 0.05, d = 0.05;
+
+  // Panneau coulissant (groupe → glisse en bloc avec ses roulettes)
+  const panel = new THREE.Group();
+  // Cadre
+  const top = new THREE.Mesh(new THREE.BoxGeometry(PW, fw, d), aluMat); top.position.y = PH/2 - fw/2; panel.add(top);
+  const bot = top.clone(); bot.position.y = -PH/2 + fw/2; panel.add(bot);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(fw, PH, d), aluMat); left.position.x = -PW/2 + fw/2; panel.add(left);
+  const right = left.clone(); right.position.x = PW/2 - fw/2; panel.add(right);
+  // Lamelles VERTICALES
+  const nSlats = 9;
+  const slatW = (PW - fw*2 - 0.02) / nSlats;
+  for (let i = 0; i < nSlats; i++) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(slatW * 0.78, PH - fw*2 - 0.02, d * 0.8), aluMat);
+    slat.position.set(-PW/2 + fw + slatW/2 + 0.01 + i * slatW, 0, 0.004);
+    panel.add(slat);
   }
+  // Roulettes (2) reliant le panneau au rail — solidaires du panneau
+  for (const rx of [-PW * 0.3, PW * 0.3]) {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.16, 0.022), MAT.hardware);
+    arm.position.set(rx, PH/2 + 0.07, -0.01); panel.add(arm);
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 16), MAT.hardware);
+    wheel.rotation.z = Math.PI/2; wheel.position.set(rx, PH/2 + 0.14, -0.02); panel.add(wheel);
+  }
+  g.add(panel);
+
+  // Rail haut industriel FIXE (le panneau glisse dessous)
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(PW * 2.3, 0.05, 0.06), MAT.hardware);
+  rail.position.set(-PW * 0.45, PH/2 + 0.14, -0.03);
+  g.add(rail);
+  // Supports du rail
+  for (const sx of [-PW * 1.4, PW * 0.6]) {
+    const sup = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.06), MAT.hardware);
+    sup.position.set(sx, PH/2 + 0.20, -0.03); g.add(sup);
+  }
+
+  // Animation : le panneau glisse vers la gauche pour dégager l'ouverture
+  const closedX = 0, openX = -PW * 0.92;
+  g.userData.setOpen = (t) => { panel.position.x = closedX + (openX - closedX) * t; };
+  g.userData.openDefault = 0.1;  // légèrement entrouvert (rendu d'expo)
+  g.userData.setOpen(g.userData.openDefault);
   return castAll(g);
 }
 
