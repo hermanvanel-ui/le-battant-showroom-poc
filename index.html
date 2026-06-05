@@ -930,7 +930,7 @@ function makeBattant(aluMat, openAngle = 0.6) {
 }
 
 // === 2) PLIANT (4 panneaux articulés en accordéon) ===
-function makePliant(aluMat) {
+function makePliant(aluMat, suspended = false) {
   const g = new THREE.Group();
   const W = 0.32, H = 1.9;
   const nPanels = 4;
@@ -942,8 +942,27 @@ function makePliant(aluMat) {
     const pivot = new THREE.Group();
     panel.position.x = W/2;
     pivot.add(panel);
+    // Suspendu : petite roulette en tête de chaque vantail (solidaire du pivot)
+    if (suspended) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.025, 14), MAT.hardware);
+      wheel.rotation.z = Math.PI/2; wheel.position.set(W/2, H/2 + 0.09, 0);
+      pivot.add(wheel);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.1, 0.018), MAT.hardware);
+      arm.position.set(W/2, H/2 + 0.04, 0); pivot.add(arm);
+    }
     g.add(pivot);
     pivots.push(pivot);
+  }
+
+  // Suspendu : rail haut FIXE qui court au-dessus (pas de rail au sol → c'est la signature du modèle)
+  if (suspended) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(W * 5, 0.05, 0.06), MAT.hardware);
+    rail.position.set(W * 0.4, H/2 + 0.13, 0);
+    g.add(rail);
+    for (const sx of [-W * 1.8, W * 2.4]) {
+      const sup = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.06), MAT.hardware);
+      sup.position.set(sx, H/2 + 0.18, 0); g.add(sup);
+    }
   }
 
   // Recalcule positions+angles selon le pliage (fold rad) : t=0 déplié (à plat) → t=1 plié (accordéon)
@@ -1012,7 +1031,7 @@ function makeCoulissant(aluMat) {
 }
 
 // === 4) BRISE-SOLEIL / BRISE-VUE (cadre + lamelles inclinées orientables) ===
-function makeBriseSoleil(aluMat, louvreAngle = -0.7) {
+function makeBriseSoleil(aluMat, louvreAngle = -0.7, withRod = false) {
   const g = new THREE.Group();
   const W = 1.0, H = 1.9, fw = 0.04, d = 0.03;
   // Cadre
@@ -1032,6 +1051,18 @@ function makeBriseSoleil(aluMat, louvreAngle = -0.7) {
     louvre.rotation.x = louvreAngle;
     g.add(louvre);
     louvres.push(louvre);
+  }
+  // Tige de commande verticale à droite (signature du brise-SOLEIL orientable vs brise-VUE fixe)
+  if (withRod) {
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, H - fw*2, 10), MAT.hardware);
+    rod.position.set(W/2 - fw - 0.04, 0, d * 1.2);
+    g.add(rod);
+    // petites biellettes reliant la tige à chaque lamelle
+    louvres.forEach(l => {
+      const link = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.012, 0.012), MAT.hardware);
+      link.position.set(W/2 - fw - 0.04, l.position.y, d * 1.0);
+      g.add(link);
+    });
   }
   // Animation : orientation des lamelles — t=0 fermé (~ -1.3 rad, occulte) → t=1 ouvert (0 rad, à plat, laisse passer)
   g.userData.setOpen = (t) => { const a = -1.3 + t * 1.3; louvres.forEach(l => l.rotation.x = a); };
@@ -1365,11 +1396,11 @@ const VOLETS = [
   { id: 0, name: 'Battant à gond',      kicker: '01 / 08', pos: [-7, 0.6, -5.2], color: 0x8FAF89, image: 'refs/volets/01-battant-gond.png', factory: () => makeBattant(MAT.aluVert, 0.55), spotColor: 0xFFD8A8 },
   { id: 1, name: 'Battant à dormant',   kicker: '02 / 08', pos: [-2.4, 0.6, -5.2], color: 0xC8C2A8, image: 'refs/volets/02-battant-dormant.png', factory: () => makeBattant(MAT.aluCreme, 0.4), spotColor: 0xFFE8C0 },
   { id: 2, name: 'Pliant',              kicker: '03 / 08', pos: [ 2.4, 0.6, -5.2], color: 0x8FAF89, image: 'refs/volets/03-pliant.png', factory: () => makePliant(MAT.aluVert), spotColor: 0xCFE6FF },
-  { id: 3, name: 'Pliant suspendu',     kicker: '04 / 08', pos: [ 7, 0.6, -5.2], color: 0x1f1f2a, image: 'refs/volets/04-pliant-suspendu.png', factory: () => makePliant(MAT.aluNoir), spotColor: 0xFFCFB6 },
+  { id: 3, name: 'Pliant suspendu',     kicker: '04 / 08', pos: [ 7, 0.6, -5.2], color: 0x1f1f2a, image: 'refs/volets/04-pliant-suspendu.png', factory: () => makePliant(MAT.aluNoir, true), spotColor: 0xFFCFB6 },
   // Sud
   { id: 4, name: 'Coulissant suspendu', kicker: '05 / 08', pos: [-7, 0.6,  5.2], color: 0x8FAF89, image: 'refs/volets/05-coulissant-suspendu.png', factory: () => makeCoulissant(MAT.aluVert), spotColor: 0xFFE8C0 },
   { id: 5, name: 'Brise-vue',           kicker: '06 / 08', pos: [-2.4, 0.6,  5.2], color: 0xC8C2A8, image: 'refs/volets/06-brise-vue.png', factory: () => makeBriseSoleil(MAT.aluCreme, -1.0), spotColor: 0xFFD8A8 },
-  { id: 6, name: 'Brise-soleil',        kicker: '07 / 08', pos: [ 2.4, 0.6,  5.2], color: 0x8FAF89, image: 'refs/volets/07-brise-soleil.png', factory: () => makeBriseSoleil(MAT.aluVert, -0.4), spotColor: 0xFFE8C0 },
+  { id: 6, name: 'Brise-soleil',        kicker: '07 / 08', pos: [ 2.4, 0.6,  5.2], color: 0x8FAF89, image: 'refs/volets/07-brise-soleil.png', factory: () => makeBriseSoleil(MAT.aluVert, -0.4, true), spotColor: 0xFFE8C0 },
   { id: 7, name: 'Séparatif balcon',    kicker: '08 / 08', pos: [ 7, 0.6,  5.2], color: 0xC5322D, image: 'refs/volets/08-separatif-balcon.png', factory: () => makeSeparatif(MAT.aluRouge), spotColor: 0xFFCFCF },
 ];
 
