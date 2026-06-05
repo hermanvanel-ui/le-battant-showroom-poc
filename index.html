@@ -956,18 +956,19 @@ function makePliant(aluMat, suspended = false) {
 
   // Suspendu : rail haut FIXE qui court au-dessus (pas de rail au sol → c'est la signature du modèle)
   if (suspended) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(W * 5, 0.05, 0.06), MAT.hardware);
-    rail.position.set(W * 0.4, H/2 + 0.13, 0);
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(W * 4.6, 0.05, 0.06), MAT.hardware);
+    rail.position.set(0, H/2 + 0.13, 0);
     g.add(rail);
-    for (const sx of [-W * 1.8, W * 2.4]) {
+    for (const sx of [-W * 2.0, W * 2.0]) {
       const sup = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.06), MAT.hardware);
       sup.position.set(sx, H/2 + 0.18, 0); g.add(sup);
     }
   }
 
   // Recalcule positions+angles selon le pliage (fold rad) : t=0 déplié (à plat) → t=1 plié (accordéon)
+  // Départ -W*2.0 → le pliant déplié est CENTRÉ sur x=0 (avant il s'étalait vers la droite)
   function layout(fold) {
-    const pos = new THREE.Vector3(-W * 1.5, 0, 0);
+    const pos = new THREE.Vector3(-W * 2.0, 0, 0);
     for (let i = 0; i < nPanels; i++) {
       const ang = (i % 2 === 0) ? -fold : fold;
       pivots[i].position.copy(pos);
@@ -986,7 +987,7 @@ function makePliant(aluMat, suspended = false) {
 // === 3) COULISSANT SUSPENDU (1 panneau à lamelles VERTICALES, type porte de grange alu) ===
 function makeCoulissant(aluMat) {
   const g = new THREE.Group();
-  const PW = 1.0, PH = 1.85, fw = 0.05, d = 0.05;
+  const PW = 1.3, PH = 1.88, fw = 0.05, d = 0.05;  // largeur = ouverture (couvre quand fermé)
 
   // Panneau coulissant (groupe → glisse en bloc avec ses roulettes)
   const panel = new THREE.Group();
@@ -996,7 +997,7 @@ function makeCoulissant(aluMat) {
   const left = new THREE.Mesh(new THREE.BoxGeometry(fw, PH, d), aluMat); left.position.x = -PW/2 + fw/2; panel.add(left);
   const right = left.clone(); right.position.x = PW/2 - fw/2; panel.add(right);
   // Lamelles VERTICALES
-  const nSlats = 9;
+  const nSlats = 12;
   const slatW = (PW - fw*2 - 0.02) / nSlats;
   for (let i = 0; i < nSlats; i++) {
     const slat = new THREE.Mesh(new THREE.BoxGeometry(slatW * 0.78, PH - fw*2 - 0.02, d * 0.8), aluMat);
@@ -1012,21 +1013,20 @@ function makeCoulissant(aluMat) {
   }
   g.add(panel);
 
-  // Rail haut industriel FIXE (le panneau glisse dessous) — couvre l'ouverture + la zone de mur à droite
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(PW * 2.1, 0.05, 0.06), MAT.hardware);
-  rail.position.set(PW * 0.45, PH/2 + 0.14, -0.03);
+  // Rail haut industriel FIXE (le panneau glisse dessous) — couvre la course (fermé → ouvert partiel à droite)
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.05, 0.06), MAT.hardware);
+  rail.position.set(0.3, PH/2 + 0.14, -0.03);
   g.add(rail);
-  // Supports du rail (près des bords du fragment de mur)
-  for (const sx of [-PW * 0.5, PW * 1.4]) {
+  // Supports du rail (restent dans le fragment de mur)
+  for (const sx of [-0.6, 1.15]) {
     const sup = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.06), MAT.hardware);
     sup.position.set(sx, PH/2 + 0.20, -0.03); g.add(sup);
   }
 
-  // Animation : le panneau glisse vers la DROITE (là où il y a du mur) pour dégager l'ouverture
-  // Borné pour rester sur le fragment de mur (l'ouverture est décalée à gauche → mur dispo à droite)
-  const closedX = 0, openX = PW * 1.0;
+  // Animation : le panneau glisse vers la DROITE pour dégager l'ouverture (course bornée → reste sur le mur)
+  const closedX = 0, openX = 0.6;
   g.userData.setOpen = (t) => { panel.position.x = closedX + (openX - closedX) * t; };
-  g.userData.openDefault = 0.12;  // légèrement entrouvert (rendu d'expo)
+  g.userData.openDefault = 0;  // fermé au repos (couvre l'ouverture)
   g.userData.setOpen(g.userData.openDefault);
   return castAll(g);
 }
@@ -1205,14 +1205,14 @@ function makeVoletEnPose(aluMat, imageUrl, factory, opts = {}) {
   const g = new THREE.Group();
 
   // Layout horizontal compact (réduit pour FOV 46° à 3.1m : visible horizontal 2.55m)
-  const WF_W = 2.2, WF_H = 2.6, WF_D = 0.35;
-  const VOLET_X = -0.45;  // Centre de l'ouverture+volet (gauche)
-  const IMG_X = +0.60;    // Centre de l'image de réf (droite)
+  const WF_W = 2.6, WF_H = 2.6, WF_D = 0.35;  // mur élargi (v0.21) pour ouverture plus grande sans déborder
+  const VOLET_X = -0.45;  // Centre de l'ouverture+volet (gauche) — inchangé (caméra non impactée)
+  const IMG_X = +0.78;    // Centre de l'image de réf (droite) — décalée pour laisser place à l'ouverture élargie
 
   // --- 1+2. Mur fragment EN 4 PIECES autour de l'ouverture (vrai trou dans le mur)
   // Fix bug texture : avant le wallSlab plein était en z-fighting avec le winRecess (les deux au même z)
   // Maintenant le mur est cloisonné autour du trou, winRecess sit derrière (à travers le trou)
-  const WIN_W = 1.0, WIN_H = 1.7;
+  const WIN_W = 1.35, WIN_H = 1.9;  // ouverture élargie pour contenir les volets (v0.21, retour Herman "ça déborde")
   const winCenterY = WF_H/2 - 0.05;
 
   const stoneWallMat = new THREE.MeshPhysicalMaterial({
