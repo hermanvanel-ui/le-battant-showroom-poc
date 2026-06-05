@@ -491,7 +491,7 @@ const plasterTexSet = loadTextureSet('painted_plaster_wall', { res:'2k', repeat:
 const asphaltTexSet = loadTextureSet('asphalt_03', { res:'1k', repeat:[6, 4] });
 // Façade bardage métallique nervuré (anthracite — comme Monsieur Store)
 // `corrugated_iron_03` Polyhaven existe (rusted) — on tint en anthracite via le color du material
-const claddingTexSet = loadTextureSet('corrugated_iron_03', { res:'1k', repeat:[3, 1.8] });
+const claddingTexSet = loadTextureSet('corrugated_iron_03', { res:'2k', repeat:[3, 1.8] });  // M2/B : 1k→2k bardage façade
 // Texture alu spécifique pour les volets (painted_metal_shutter = alu thermolaqué)
 const aluShutterTex = loadTextureSet('painted_metal_shutter', { res:'1k', repeat:[1, 2] });
 
@@ -792,6 +792,24 @@ const signageMat = new THREE.MeshStandardMaterial({
 const signage = new THREE.Mesh(new THREE.BoxGeometry(doorW + 0.8, 1.1, 0.18), signageMat);
 signage.position.set(0, SR.wallH + 0.55, FACADE_Z + 0.13);
 scene.add(signage);
+
+// ──── PORTE SECTIONNELLE de livraison à droite (comme la réf façade Monsieur Store) ────
+(function makeSectionalDoor() {
+  const SD_W = 2.9, SD_H = 2.75, SD_X = 5.2, SD_Z = FACADE_Z + 0.05;
+  const greyMat = new THREE.MeshPhysicalMaterial({ color: 0x9AA0A6, metalness: 0.55, roughness: 0.5, clearcoat: 0.2, envMapIntensity: 0.5 });
+  const fw = 0.12;
+  const fTop = new THREE.Mesh(new THREE.BoxGeometry(SD_W + fw*2, fw, 0.12), MAT.steelBlack);
+  fTop.position.set(SD_X, SD_H + fw/2, SD_Z); scene.add(fTop);
+  const fL = new THREE.Mesh(new THREE.BoxGeometry(fw, SD_H, 0.12), MAT.steelBlack);
+  fL.position.set(SD_X - SD_W/2 - fw/2, SD_H/2, SD_Z); scene.add(fL);
+  const fR = fL.clone(); fR.position.x = SD_X + SD_W/2 + fw/2; scene.add(fR);
+  const nSec = 6, secH = SD_H / nSec;
+  for (let i = 0; i < nSec; i++) {
+    const sec = new THREE.Mesh(new THREE.BoxGeometry(SD_W, secH * 0.9, 0.06), greyMat);
+    sec.position.set(SD_X, secH/2 + i*secH, SD_Z);
+    sec.castShadow = true; sec.receiveShadow = true; scene.add(sec);
+  }
+})();
 
 // ──── PARKING ASPHALTE devant le bâtiment ────
 const parking = new THREE.Mesh(new THREE.BoxGeometry(40, 0.1, 18), MAT.asphalt);
@@ -1645,8 +1663,8 @@ scene.add(doorBeam);
 // TOUR (scrollT 0.1 → 1.0) : 9 WPs (V0..V7 + outro), volets à ±1.8 de la centerline
 
 const HERO_WP = [
-  { p:[0, 2.4, 13],         l:[0, 2.2, 8] },          // 0 — face au bâtiment, recul
-  { p:[0, 2.0, 9.5],        l:[0, 1.85, 6] },         // 1 — on s'approche
+  { p:[0, 3.6, 22],         l:[0, 2.6, 7] },          // 0 — PLAN LARGE : bâtiment entier (comme la réf façade) — voit l'enseigne + entrée + porte sectionnelle
+  { p:[0, 2.4, 13],         l:[0, 2.1, 6.5] },        // 1 — on s'approche de l'entrée
   { p:[0, 1.65, 5.5],       l:[0, 1.55, 1.5] },       // 2 — passe la porte (mur sud à z=7 traversé à x∈[0, +0.5] ✓ dans door [-1.5, 1.5])
   // HERO[3] = TOUR[0] (V0 NW) → continuité parfaite à scrollT=0.1 (pos ET look identiques)
   // ⚠ Centré sur le VOLET (world x=-7.45), pas sur le centre de l'exhibit (x=-7)
