@@ -983,7 +983,7 @@ function makePliant(aluMat, suspended = false) {
   }
   const MAXF = 0.95;
   g.userData.setOpen = (t) => layout(t * MAXF);
-  g.userData.openDefault = 0.74;  // ~0.7 rad plié (rendu d'expo)
+  g.userData.openDefault = 0.06;  // quasi-déplié au repos → panneaux jointifs (reliés), pas d'espace ; l'accordéon se voit à l'animation
   g.userData.setOpen(g.userData.openDefault);
   return g;
 }
