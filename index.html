@@ -930,6 +930,7 @@ function makePliant(aluMat, suspended = false) {
   const W = 0.32, H = 1.9;
   const nPanels = 4;
   const pivots = [];
+  const brass = new THREE.MeshPhysicalMaterial({ color: 0xC9A268, metalness: 0.9, roughness: 0.35, clearcoat: 0.5 });
 
   for (let i = 0; i < nPanels; i++) {
     const panel = makeBattantPanel(aluMat, i % 2 === 0);
@@ -937,6 +938,14 @@ function makePliant(aluMat, suspended = false) {
     const pivot = new THREE.Group();
     panel.position.x = W/2;
     pivot.add(panel);
+    // Charnières laiton à l'articulation avec le vantail suivant (liaison accordéon) — au bord x=W, solidaires du pivot
+    if (i < nPanels - 1) {
+      for (let k = 0; k < 4; k++) {
+        const knuckle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.12, 10), brass);
+        knuckle.position.set(W, -H/2 + 0.25 + k * (H - 0.5) / 3, 0.018);
+        pivot.add(knuckle);
+      }
+    }
     // Suspendu : petite roulette en tête de chaque vantail (solidaire du pivot)
     if (suspended) {
       const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.025, 14), MAT.hardware);
