@@ -109,6 +109,16 @@
   .pin-kicker { font-size:12px; letter-spacing:0.3em; text-transform:uppercase; color:var(--creme-faint); margin-bottom:12px; }
   .pin-title { font-size:32px; font-weight:800; color:var(--creme); margin-bottom:14px; letter-spacing:-0.015em; line-height:1; }
   .pin-spec { font-size:16px; line-height:1.5; color:var(--creme-soft); }
+  .pin-anim-btn {
+    margin-top:18px; pointer-events:auto; cursor:pointer;
+    display:inline-flex; align-items:center; gap:8px;
+    font:600 13px/1 system-ui, sans-serif; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--creme); background:var(--rouge); border:none; border-radius:3px;
+    padding:11px 18px; transition:filter .2s, transform .1s;
+  }
+  .pin-anim-btn:hover { filter:brightness(1.12); }
+  .pin-anim-btn:active { transform:translateY(1px); }
+  .pin-anim-btn.playing { background:rgba(40,40,46,0.92); color:var(--creme-soft); cursor:default; }
 
   /* Cache le texte des sections intermédiaires (les volets ont leurs propres pins 3D) */
   section[data-room]:not([data-room="0"]) .container { display:none; }
@@ -125,6 +135,7 @@
     .pin-kicker { font-size:10px; letter-spacing:0.25em; margin-bottom:6px; }
     .pin-title { font-size:20px; margin-bottom:8px; }
     .pin-spec { font-size:13px; line-height:1.45; }
+    .pin-anim-btn { margin-top:10px; padding:9px 14px; font-size:12px; }
 
     /* HUD : dots plus petits et collés au bord, mais cliquables */
     #progress { right:8px; padding:8px 4px; gap:7px; }
@@ -901,7 +912,6 @@ function makeBattant(aluMat, openAngle = 0.6) {
   leftPivot.position.set(-W, 0, 0);
   leftPanel.position.x = W/2;
   leftPivot.add(leftPanel);
-  leftPivot.rotation.y = -openAngle;
   g.add(leftPivot);
 
   const rightPanel = makeBattantPanel(aluMat, false);
@@ -909,9 +919,13 @@ function makeBattant(aluMat, openAngle = 0.6) {
   rightPivot.position.set(W, 0, 0);
   rightPanel.position.x = -W/2;
   rightPivot.add(rightPanel);
-  rightPivot.rotation.y = openAngle;
   g.add(rightPivot);
 
+  // Animation : t=0 fermé (panneaux à plat) → t=1 grand ouvert (~97°)
+  const MAXA = 1.7;
+  g.userData.setOpen = (t) => { const a = t * MAXA; leftPivot.rotation.y = -a; rightPivot.rotation.y = a; };
+  g.userData.openDefault = Math.min(1, openAngle / MAXA);
+  g.userData.setOpen(g.userData.openDefault);
   return g;
 }
 
@@ -920,23 +934,33 @@ function makePliant(aluMat) {
   const g = new THREE.Group();
   const W = 0.32, H = 1.9;
   const nPanels = 4;
-  let prevPivot = null;
-  let currentPos = new THREE.Vector3(-W * 1.5, 0, 0);
-  const foldAngle = 0.7;
+  const pivots = [];
 
   for (let i = 0; i < nPanels; i++) {
     const panel = makeBattantPanel(aluMat, i % 2 === 0);
     panel.scale.x = W / 0.6;  // ajuste à la largeur W
     const pivot = new THREE.Group();
-    pivot.position.copy(currentPos);
     panel.position.x = W/2;
     pivot.add(panel);
-    pivot.rotation.y = (i % 2 === 0) ? -foldAngle : foldAngle;
     g.add(pivot);
-    // calcule la prochaine position au bout du panneau (orientation appliquée)
-    currentPos.x += W * Math.cos((i % 2 === 0) ? -foldAngle : foldAngle);
-    currentPos.z += W * Math.sin((i % 2 === 0) ? -foldAngle : foldAngle);
+    pivots.push(pivot);
   }
+
+  // Recalcule positions+angles selon le pliage (fold rad) : t=0 déplié (à plat) → t=1 plié (accordéon)
+  function layout(fold) {
+    const pos = new THREE.Vector3(-W * 1.5, 0, 0);
+    for (let i = 0; i < nPanels; i++) {
+      const ang = (i % 2 === 0) ? -fold : fold;
+      pivots[i].position.copy(pos);
+      pivots[i].rotation.y = ang;
+      pos.x += W * Math.cos(ang);
+      pos.z += W * Math.sin(ang);
+    }
+  }
+  const MAXF = 0.95;
+  g.userData.setOpen = (t) => layout(t * MAXF);
+  g.userData.openDefault = 0.74;  // ~0.7 rad plié (rendu d'expo)
+  g.userData.setOpen(g.userData.openDefault);
   return g;
 }
 
@@ -947,6 +971,10 @@ function makeCoulissant(aluMat) {
   const p1 = makeBattantPanel(aluMat, true); p1.position.set(-W/2 - 0.05, 0, 0);
   const p2 = makeBattantPanel(aluMat, false); p2.position.set(W/2 + 0.05, 0, 0.04);
   g.add(p1); g.add(p2);
+  // Animation : le vantail droit glisse pour se superposer au gauche — t=0 fermé (couvre) → t=1 ouvert (dégage)
+  const closedX = W/2 + 0.05, openX = -W/2 + 0.02;
+  g.userData.setOpen = (t) => { p2.position.x = closedX + (openX - closedX) * t; };
+  g.userData.openDefault = 0;
   // Rail haut (suspension)
   const rail = new THREE.Mesh(new THREE.BoxGeometry(W * 3, 0.06, 0.08), MAT.hardware);
   rail.position.set(0, H/2 + 0.06, 0);
@@ -971,15 +999,21 @@ function makeBriseSoleil(aluMat, louvreAngle = -0.7) {
   const left = new THREE.Mesh(new THREE.BoxGeometry(fw, H, d), aluMat);
   left.position.set(-W/2 + fw/2, 0, 0); g.add(left);
   const right = left.clone(); right.position.x = W/2 - fw/2; g.add(right);
-  // Lamelles obliques (12)
+  // Lamelles obliques (14)
   const nLouvres = 14;
   const louvreH = (H - fw*2) / nLouvres;
+  const louvres = [];
   for (let i = 0; i < nLouvres; i++) {
     const louvre = new THREE.Mesh(new THREE.BoxGeometry(W - fw*2 - 0.01, louvreH * 0.65, d * 1.8), aluMat);
     louvre.position.set(0, -H/2 + fw + louvreH/2 + i * louvreH, 0);
     louvre.rotation.x = louvreAngle;
     g.add(louvre);
+    louvres.push(louvre);
   }
+  // Animation : orientation des lamelles — t=0 fermé (~ -1.3 rad, occulte) → t=1 ouvert (0 rad, à plat, laisse passer)
+  g.userData.setOpen = (t) => { const a = -1.3 + t * 1.3; louvres.forEach(l => l.rotation.x = a); };
+  g.userData.openDefault = Math.max(0, Math.min(1, (louvreAngle + 1.3) / 1.3));
+  g.userData.setOpen(g.userData.openDefault);
   return castAll(g);
 }
 
@@ -1184,6 +1218,9 @@ function makeVoletEnPose(aluMat, imageUrl, factory, opts = {}) {
   const volet = (typeof factory === 'function') ? factory() : makeBattant(aluMat, 1.0);
   volet.position.set(VOLET_X, winCenterY, WF_D/2 + 0.06);
   g.add(volet);
+  // Expose la commande d'animation du volet au groupe exhibit (pour le bouton "Voir l'animation")
+  g.userData.setOpen = volet.userData.setOpen;
+  g.userData.openDefault = volet.userData.openDefault;
 
   // Paumelles visibles aux gonds extérieurs — uniquement pour les battants (opts.hinges)
   if (opts.hinges !== false) {
@@ -1327,6 +1364,8 @@ const VOLET_TEXTS = [
 
 // Pins HTML — ancrés à la 3D, suivent leur position projetée à chaque frame
 const PINS = [];
+// Anims de volets (pilotées par le bouton "Voir l'animation")
+const VOLET_ANIM = [];
 VOLETS.forEach((v, i) => {
   // Piédestal
   const ped = makePedestal(`${v.kicker.split(' / ')[0]} ${v.name}`, v.id < 4 ? 0x8FAF89 : 0xC5322D);
@@ -1360,8 +1399,17 @@ VOLETS.forEach((v, i) => {
   const t = VOLET_TEXTS[i];
   const div = document.createElement('div');
   div.className = 'volet-pin';
-  div.innerHTML = `<div class="pin-kicker">${t.kicker}</div><div class="pin-title">${t.title}</div><div class="pin-spec">${t.spec}</div>`;
+  // Bouton d'anim : seulement pour les volets mobiles (pas brise-vue id5 ni séparatif id7, qui sont fixes)
+  const canAnim = !!(exhibit.userData && exhibit.userData.setOpen) && v.id !== 5;
+  div.innerHTML = `<div class="pin-kicker">${t.kicker}</div><div class="pin-title">${t.title}</div><div class="pin-spec">${t.spec}</div>`
+    + (canAnim ? `<button class="pin-anim-btn" type="button">▶ Voir l'animation</button>` : '');
   document.body.appendChild(div);
+  if (canAnim) {
+    const setOpen = exhibit.userData.setOpen, def = exhibit.userData.openDefault ?? 0;
+    const rec = { setOpen, def, playing: false, time: 0, btn: div.querySelector('.pin-anim-btn') };
+    VOLET_ANIM[i] = rec;
+    rec.btn.addEventListener('click', (e) => { e.stopPropagation(); playVoletAnim(i); });
+  }
   // Ancrage en 3D : SOUS le volet/board, centré horizontalement par rapport à ce que la camera regarde
   // V0 (avec image en pose) : pin centré sous le VOLET (x-0.45 du centre exhibit), pas sous l'image
   // Autres : pin centré sous le board (v.pos[0])
@@ -1386,11 +1434,50 @@ function updatePins() {
       const y = (-_pinProj.y * 0.5 + 0.5) * innerHeight;
       pin.div.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
       pin.div.style.opacity = fade;
+      pin.div.style.pointerEvents = fade > 0.6 ? 'auto' : 'none';
     } else {
       pin.div.style.opacity = 0;
+      pin.div.style.pointerEvents = 'none';
     }
   }
 }
+
+// =========================================================
+// ANIMATION DES VOLETS (bouton "Voir l'animation")
+// Cycle : fermé → maintien → ouvert → maintien → retour au repos. Caméra FIXE.
+// =========================================================
+const ANIM_DUR = 3.9;
+function _animValue(time, def) {
+  const keys = [[0, def], [0.6, 0], [1.1, 0], [2.4, 1], [3.1, 1], [3.9, def]];
+  for (let k = 1; k < keys.length; k++) {
+    if (time < keys[k][0]) {
+      const t0 = keys[k-1][0], v0 = keys[k-1][1], t1 = keys[k][0], v1 = keys[k][1];
+      return v0 + (v1 - v0) * easeInOutCubic((time - t0) / (t1 - t0));
+    }
+  }
+  return def;
+}
+function playVoletAnim(i) {
+  const rec = VOLET_ANIM[i];
+  if (!rec || rec.playing) return;
+  rec.playing = true; rec.time = 0;
+  if (rec.btn) { rec.btn.classList.add('playing'); rec.btn.textContent = '● Animation…'; }
+}
+function updateVoletAnims(dt) {
+  dt = Math.min(dt, 0.05);  // clamp : une frame longue (onglet throttlé) ne fait pas sauter toute l'anim
+  for (const rec of VOLET_ANIM) {
+    if (!rec || !rec.playing) continue;
+    rec.time += dt;
+    if (rec.time >= ANIM_DUR) {
+      rec.playing = false; rec.setOpen(rec.def);
+      if (rec.btn) { rec.btn.classList.remove('playing'); rec.btn.textContent = "▶ Voir l'animation"; }
+    } else {
+      rec.setOpen(_animValue(rec.time, rec.def));
+    }
+  }
+}
+// Hook debug : permet de déclencher l'animation par programme (tests / future fonction "tout animer")
+window.playVoletAnim = playVoletAnim;
 
 // =========================================================
 // HERO VOLET (à l'entrée, façade sud du showroom)
@@ -1595,6 +1682,9 @@ function loop() {
   camera.position.copy(cam.pos);
   lookV.copy(cam.look);
   camera.lookAt(lookV);
+
+  // Animations de volets (bouton)
+  updateVoletAnims(dt);
 
   // MAJ pins 3D
   updatePins();
