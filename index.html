@@ -1112,7 +1112,7 @@ function makeBoardTexture(label, kicker, color) {
 // VOLET EN CONDITION DE POSE — mur fragment + ouverture + volet monté + image ref
 // (retour Herman v0.8 : "modélisation du volet en condition de pose, image à côté")
 // =========================================================
-function makeVoletEnPose(aluMat, imageUrl) {
+function makeVoletEnPose(aluMat, imageUrl, factory, opts = {}) {
   const g = new THREE.Group();
 
   // Layout horizontal compact (réduit pour FOV 46° à 3.1m : visible horizontal 2.55m)
@@ -1180,18 +1180,20 @@ function makeVoletEnPose(aluMat, imageUrl) {
   winLight.position.set(VOLET_X, winCenterY, WF_D/2 - 0.4);
   g.add(winLight);
 
-  // --- 3. Volet battant 2 panneaux ouvert ~60° sur paumelles ---
-  const battant = makeBattant(aluMat, 1.0);
-  battant.position.set(VOLET_X, winCenterY, WF_D/2 + 0.06);
-  g.add(battant);
+  // --- 3. Volet du BON TYPE (factory) monté dans l'ouverture ---
+  const volet = (typeof factory === 'function') ? factory() : makeBattant(aluMat, 1.0);
+  volet.position.set(VOLET_X, winCenterY, WF_D/2 + 0.06);
+  g.add(volet);
 
-  // Paumelles visibles aux gonds extérieurs (pivots à x=±W=±0.6 dans le frame local de battant)
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 3; i++) {
-      const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 12), MAT.steelBlack);
-      hinge.rotation.z = Math.PI/2;
-      hinge.position.set(VOLET_X + side * 0.6, winCenterY - 0.7 + i * 0.6, WF_D/2 + 0.05);
-      g.add(hinge);
+  // Paumelles visibles aux gonds extérieurs — uniquement pour les battants (opts.hinges)
+  if (opts.hinges !== false) {
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 12), MAT.steelBlack);
+        hinge.rotation.z = Math.PI/2;
+        hinge.position.set(VOLET_X + side * 0.6, winCenterY - 0.7 + i * 0.6, WF_D/2 + 0.05);
+        g.add(hinge);
+      }
     }
   }
 
@@ -1300,15 +1302,15 @@ function makeDisplayBoard(label, kicker, color, imageUrl) {
 const VOLETS = [
   // Nord
   // 🆕 V0 : utilise une vraie image Gemini (test d'intégration) — photo réelle volet battant en NB
-  { id: 0, name: 'Battant à gond',      kicker: '01 / 08', pos: [-7, 0.6, -5.2], color: 0x8FAF89, image: 'refs/volets/01-battant-a-gond.png', factory: () => makeBattant(MAT.aluVert, 0.55), spotColor: 0xFFD8A8 },
-  { id: 1, name: 'Battant à dormant',   kicker: '02 / 08', pos: [-2.4, 0.6, -5.2], color: 0xC8C2A8, factory: () => makeBattant(MAT.aluCreme, 0.4), spotColor: 0xFFE8C0 },
-  { id: 2, name: 'Pliant',              kicker: '03 / 08', pos: [ 2.4, 0.6, -5.2], color: 0x8FAF89, factory: () => makePliant(MAT.aluVert), spotColor: 0xCFE6FF },
-  { id: 3, name: 'Pliant suspendu',     kicker: '04 / 08', pos: [ 7, 0.6, -5.2], color: 0x1f1f2a, factory: () => makePliant(MAT.aluNoir), spotColor: 0xFFCFB6 },
+  { id: 0, name: 'Battant à gond',      kicker: '01 / 08', pos: [-7, 0.6, -5.2], color: 0x8FAF89, image: 'refs/volets/01-battant-gond.png', factory: () => makeBattant(MAT.aluVert, 0.55), spotColor: 0xFFD8A8 },
+  { id: 1, name: 'Battant à dormant',   kicker: '02 / 08', pos: [-2.4, 0.6, -5.2], color: 0xC8C2A8, image: 'refs/volets/02-battant-dormant.png', factory: () => makeBattant(MAT.aluCreme, 0.4), spotColor: 0xFFE8C0 },
+  { id: 2, name: 'Pliant',              kicker: '03 / 08', pos: [ 2.4, 0.6, -5.2], color: 0x8FAF89, image: 'refs/volets/03-pliant.png', factory: () => makePliant(MAT.aluVert), spotColor: 0xCFE6FF },
+  { id: 3, name: 'Pliant suspendu',     kicker: '04 / 08', pos: [ 7, 0.6, -5.2], color: 0x1f1f2a, image: 'refs/volets/04-pliant-suspendu.png', factory: () => makePliant(MAT.aluNoir), spotColor: 0xFFCFB6 },
   // Sud
-  { id: 4, name: 'Coulissant suspendu', kicker: '05 / 08', pos: [-7, 0.6,  5.2], color: 0x8FAF89, factory: () => makeCoulissant(MAT.aluVert), spotColor: 0xFFE8C0 },
-  { id: 5, name: 'Brise-vue',           kicker: '06 / 08', pos: [-2.4, 0.6,  5.2], color: 0xC8C2A8, factory: () => makeBriseSoleil(MAT.aluCreme, -1.0), spotColor: 0xFFD8A8 },
-  { id: 6, name: 'Brise-soleil',        kicker: '07 / 08', pos: [ 2.4, 0.6,  5.2], color: 0x8FAF89, factory: () => makeBriseSoleil(MAT.aluVert, -0.4), spotColor: 0xFFE8C0 },
-  { id: 7, name: 'Séparatif balcon',    kicker: '08 / 08', pos: [ 7, 0.6,  5.2], color: 0xC5322D, factory: () => makeSeparatif(MAT.aluRouge), spotColor: 0xFFCFCF },
+  { id: 4, name: 'Coulissant suspendu', kicker: '05 / 08', pos: [-7, 0.6,  5.2], color: 0x8FAF89, image: 'refs/volets/05-coulissant-suspendu.png', factory: () => makeCoulissant(MAT.aluVert), spotColor: 0xFFE8C0 },
+  { id: 5, name: 'Brise-vue',           kicker: '06 / 08', pos: [-2.4, 0.6,  5.2], color: 0xC8C2A8, image: 'refs/volets/06-brise-vue.png', factory: () => makeBriseSoleil(MAT.aluCreme, -1.0), spotColor: 0xFFD8A8 },
+  { id: 6, name: 'Brise-soleil',        kicker: '07 / 08', pos: [ 2.4, 0.6,  5.2], color: 0x8FAF89, image: 'refs/volets/07-brise-soleil.png', factory: () => makeBriseSoleil(MAT.aluVert, -0.4), spotColor: 0xFFE8C0 },
+  { id: 7, name: 'Séparatif balcon',    kicker: '08 / 08', pos: [ 7, 0.6,  5.2], color: 0xC5322D, image: 'refs/volets/08-separatif-balcon.png', factory: () => makeSeparatif(MAT.aluRouge), spotColor: 0xFFCFCF },
 ];
 
 // Specs textuelles pour les pins 3D (HTML labels ancrés à chaque volet)
@@ -1340,7 +1342,7 @@ VOLETS.forEach((v, i) => {
                    v.color === 0xC8C2A8 ? MAT.aluCreme :
                    v.color === 0xC5322D ? MAT.aluRouge :
                    MAT.aluNoir;
-    exhibit = makeVoletEnPose(aluMat, v.image);
+    exhibit = makeVoletEnPose(aluMat, v.image, v.factory, { hinges: v.id <= 1 });
     // Position : mur fragment au même z que le board ancien (caméra reste à distance correcte ~3m)
     exhibit.position.set(v.pos[0], 0, v.pos[2] + (v.pos[2] < 0 ? 0.15 : -0.15));
     exhibit.rotation.y = v.pos[2] < 0 ? 0 : Math.PI;
