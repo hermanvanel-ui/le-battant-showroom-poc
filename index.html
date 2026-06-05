@@ -480,9 +480,9 @@ const hdriPromise = loadHDRI('industrial_sunset_02', '1k').then(hdri => {
 // asphalte (sol extérieur), bardage métal (façade), painted_metal_shutter (volets)
 // =========================================================
 // Sol intérieur — carrelage terrazzo beige (style showroom PAAL)
-const tileTexSet = loadTextureSet('terrazzo_tiles', { res:'1k', repeat:[2.5, 2.5] });
+const tileTexSet = loadTextureSet('terrazzo_tiles', { res:'2k', repeat:[2.5, 2.5] });  // M2 : 1k→2k (sol = surface la plus visible)
 // Murs intérieurs blancs cassés
-const plasterTexSet = loadTextureSet('painted_plaster_wall', { res:'1k', repeat:[3, 1.5] });
+const plasterTexSet = loadTextureSet('painted_plaster_wall', { res:'2k', repeat:[3, 1.5] });  // M2 : 1k→2k
 // Sol extérieur asphalte
 const asphaltTexSet = loadTextureSet('asphalt_03', { res:'1k', repeat:[6, 4] });
 // Façade bardage métallique nervuré (anthracite — comme Monsieur Store)
