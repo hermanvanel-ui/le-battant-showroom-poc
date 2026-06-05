@@ -954,19 +954,23 @@ function makePliant(aluMat, suspended = false) {
   // reliées par un axe à l'arête commune (x=W de pivot i = x=0 de pivot i+1). Quand ça se plie, chaque lame suit
   // son panneau → la charnière s'articule en V (elle se PLIE), comme une vraie. 3 charnières par jonction (haut/milieu/bas).
   for (let i = 0; i < nPanels - 1; i++) {
+    // Côté INTÉRIEUR du pli (concave) — alterne à chaque jonction comme un vrai accordéon.
+    // Les charnières sont posées sur la face intérieure, pas sur l'avant (cf. image de réf).
+    const zside = (i % 2 === 0) ? -1 : 1;
+    const zLeaf = zside * 0.026, zPin = zside * 0.03;
     for (let k = 0; k < 3; k++) {
       const y = -H/2 + 0.35 + k * (H - 0.7) / 2;
-      // Lame sur le panneau i (près de son bord droit x=W), pointe vers l'intérieur
+      // Lame sur le panneau i (près de son bord droit x=W), face intérieure
       const leafA = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.012), brass);
-      leafA.position.set(W - 0.045, y, 0.026);
+      leafA.position.set(W - 0.045, y, zLeaf);
       pivots[i].add(leafA);
-      // Lame sur le panneau i+1 (près de son bord gauche x=0), pointe vers l'intérieur
+      // Lame sur le panneau i+1 (près de son bord gauche x=0), face intérieure
       const leafB = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.012), brass);
-      leafB.position.set(0.045, y, 0.026);
+      leafB.position.set(0.045, y, zLeaf);
       pivots[i + 1].add(leafB);
       // Axe (knuckle) à l'arête commune — solidaire du panneau i
       const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.075, 10), brass);
-      pin.position.set(W, y, 0.03);
+      pin.position.set(W, y, zPin);
       pivots[i].add(pin);
     }
   }
@@ -996,7 +1000,7 @@ function makePliant(aluMat, suspended = false) {
   }
   const MAXF = 0.95;
   g.userData.setOpen = (t) => layout(t * MAXF);
-  g.userData.openDefault = 0.0;  // parfaitement déplié au repos → panneaux coplanaires jointifs (aucun pli sombre), reliés par les pattes laiton
+  g.userData.openDefault = 0.6;  // plié au repos comme la photo de réf (accordéon en W) → on voit les charnières sur l'intérieur des plis
   g.userData.setOpen(g.userData.openDefault);
   return g;
 }
