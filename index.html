@@ -21,6 +21,9 @@
 
   #scene-wrap { position:fixed; inset:0; z-index:0; }
   #scene-wrap canvas { display:block; width:100%; height:100%; }
+  /* M2 : vignettage léger (cadre premium) — au-dessus du canvas, sous les pins/HUD */
+  #vignette { position:fixed; inset:0; z-index:1; pointer-events:none;
+    background: radial-gradient(ellipse at 50% 45%, transparent 52%, rgba(0,0,0,0.38) 100%); }
 
   main { position:relative; z-index:2; pointer-events:none; }
   /* Sections 160vh : plus de temps de lecture des descriptions au scroll (retour Herman v0.9) */
@@ -176,6 +179,7 @@
 
 <div id="loader"><div class="lring"></div><div class="l-label">Préparation du showroom</div><div class="l-progress" id="l-progress">Chargement des textures…</div></div>
 <div id="scene-wrap"></div>
+<div id="vignette"></div>
 
 <div id="brand" class="hud panel">
   <div class="b1">le battant</div>
@@ -494,6 +498,26 @@ const aluShutterTex = loadTextureSet('painted_metal_shutter', { res:'1k', repeat
 // =========================================================
 // MATÉRIAUX
 // =========================================================
+// M2 : normal map "brossé alu" procédural (fines stries verticales) — micro-relief subtil, garde l'aspect mat
+function makeBrushedNormal() {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = 'rgb(128,128,255)'; x.fillRect(0, 0, 128, 256);  // normale plate par défaut
+  for (let i = 0; i < 220; i++) {
+    const px = (i * 53) % 128;
+    const tilt = ((i * 31) % 2 === 0) ? 12 : -12;  // léger tilt gauche/droite (déterministe)
+    x.strokeStyle = `rgba(${128 + tilt},128,255,0.45)`;
+    x.lineWidth = 1;
+    x.beginPath(); x.moveTo(px + 0.5, 0); x.lineTo(px + 0.5, 256); x.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 4);
+  return t;
+}
+const brushedNormal = makeBrushedNormal();
+const ALU_NORMAL_SCALE = new THREE.Vector2(0.12, 0.12);
+
 const MAT = {
   // Sol carrelage grand format beige (ton showroom PAAL)
   // color fallback beige chaud + envMapIntensity bas pour ne pas absorber la teinte bleue du HDRI
@@ -523,25 +547,29 @@ const MAT = {
     color: 0x8FAF89,
     metalness: 0.35, roughness: 0.58,
     clearcoat: 0.25, clearcoatRoughness: 0.4,
-    envMapIntensity: 0.6
+    envMapIntensity: 0.6,
+    normalMap: brushedNormal, normalScale: ALU_NORMAL_SCALE
   }),
   aluCreme: new THREE.MeshPhysicalMaterial({
     color: 0xC8C2A8,
     metalness: 0.32, roughness: 0.6,
     clearcoat: 0.22, clearcoatRoughness: 0.42,
-    envMapIntensity: 0.55
+    envMapIntensity: 0.55,
+    normalMap: brushedNormal, normalScale: ALU_NORMAL_SCALE
   }),
   aluRouge: new THREE.MeshPhysicalMaterial({
     color: 0xC5322D,
     metalness: 0.35, roughness: 0.55,
     clearcoat: 0.25, clearcoatRoughness: 0.38,
-    envMapIntensity: 0.6
+    envMapIntensity: 0.6,
+    normalMap: brushedNormal, normalScale: ALU_NORMAL_SCALE
   }),
   aluNoir: new THREE.MeshPhysicalMaterial({
     color: 0x1f1f2a,
     metalness: 0.45, roughness: 0.5,
     clearcoat: 0.3, clearcoatRoughness: 0.35,
-    envMapIntensity: 0.6
+    envMapIntensity: 0.6,
+    normalMap: brushedNormal, normalScale: ALU_NORMAL_SCALE
   }),
   // Quincaillerie (paumelles, poignées) — noir brillant
   hardware: new THREE.MeshPhysicalMaterial({
