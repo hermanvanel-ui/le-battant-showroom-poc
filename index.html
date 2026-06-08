@@ -350,7 +350,7 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+// import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';  // perf: removed
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -428,11 +428,11 @@ scene.fog = new THREE.FogExp2(0x9E9070, 0.012);
 function computeFOV() { return (innerHeight > innerWidth) ? 75 : 46; }
 const camera = new THREE.PerspectiveCamera(computeFOV(), innerWidth/innerHeight, 0.1, 300);
 
-const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:'high-performance' }); // antialias off — composer handles it
 // Fallback à 1280x720 si la page démarre avec un viewport 0x0 (tab cachée au boot via Preview MCP/headless)
 const _initW = Math.max(innerWidth, 1280), _initH = Math.max(innerHeight, 720);
 renderer.setSize(_initW, _initH);
-renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.setPixelRatio(Math.min(1.5, devicePixelRatio)); // perf: cap DPR (2→1.5) — saves ~44% fill rate on Retina
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -442,16 +442,13 @@ wrap.appendChild(renderer.domElement);
 
 const renderPass = new RenderPass(scene, camera);
 // SSAO subtil pour donner du contact aux objets (recoins, joints, intersections)
-const ssaoPass = new SSAOPass(scene, camera, innerWidth, innerHeight);
-ssaoPass.kernelRadius = 0.32;
-ssaoPass.minDistance = 0.001;
-ssaoPass.maxDistance = 0.08;
-ssaoPass.output = SSAOPass.OUTPUT.Default;
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.11, 0.5, 0.92);
+// SSAO disabled for performance — nearly invisible at kernelRadius 0.32 but costs 5-15ms/frame
+// const ssaoPass = new SSAOPass(scene, camera, innerWidth, innerHeight);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(Math.floor(innerWidth/2), Math.floor(innerHeight/2)), 0.11, 0.5, 0.92); // half-res bloom
 const outputPass = new OutputPass();
 const composer = new EffectComposer(renderer);
 composer.addPass(renderPass);
-composer.addPass(ssaoPass);
+// composer.addPass(ssaoPass);  // perf: removed
 composer.addPass(bloomPass);
 composer.addPass(outputPass);
 
@@ -461,7 +458,7 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   composer.setSize(innerWidth, innerHeight);
-  ssaoPass.setSize(innerWidth, innerHeight);
+  // ssaoPass.setSize(innerWidth, innerHeight);  // SSAO disabled
 });
 
 // =========================================================
@@ -486,12 +483,12 @@ const hdriPromise = loadHDRI('industrial_sunset_02', '1k').then(hdri => {
 // Sol intérieur — carrelage terrazzo beige (style showroom PAAL)
 const tileTexSet = loadTextureSet('terrazzo_tiles', { res:'2k', repeat:[2.5, 2.5] });  // M2 : 1k→2k (sol = surface la plus visible)
 // Murs intérieurs blancs cassés
-const plasterTexSet = loadTextureSet('painted_plaster_wall', { res:'2k', repeat:[3, 1.5] });  // M2 : 1k→2k
+const plasterTexSet = loadTextureSet('painted_plaster_wall', { res:'1k', repeat:[3, 1.5] });  // perf: 2k→1k (walls not focal point)
 // Sol extérieur asphalte
 const asphaltTexSet = loadTextureSet('asphalt_03', { res:'1k', repeat:[6, 4] });
 // Façade bardage métallique nervuré (anthracite — comme Monsieur Store)
 // `corrugated_iron_03` Polyhaven existe (rusted) — on tint en anthracite via le color du material
-const claddingTexSet = loadTextureSet('corrugated_iron_03', { res:'2k', repeat:[3, 1.8] });  // M2/B : 1k→2k bardage façade
+const claddingTexSet = loadTextureSet('corrugated_iron_03', { res:'1k', repeat:[3, 1.8] });  // perf: 2k→1k facade cladding
 // Texture alu spécifique pour les volets (painted_metal_shutter = alu thermolaqué)
 const aluShutterTex = loadTextureSet('painted_metal_shutter', { res:'1k', repeat:[1, 2] });
 
@@ -830,7 +827,7 @@ function makeSpot(x, z, targetX, targetY, targetZ, color = 0xFFEEC0, intensity =
   const s = new THREE.SpotLight(color, intensity, 8, Math.PI/4.5, 0.55, 1.5);
   s.position.set(x, SR.wallH - 0.2, z);
   s.castShadow = true;
-  s.shadow.mapSize.set(2048, 2048);  // M2 : 1024→2048, ombres plus nettes sur les volets
+  s.shadow.mapSize.set(512, 512);  // perf: 2048→512, saves ~128MB GPU shadow atlas
   s.shadow.bias = -0.0001;
   s.shadow.radius = 3;  // bord d'ombre légèrement adouci (premium)
   const t = new THREE.Object3D();
@@ -866,7 +863,7 @@ scene.add(showroomFill);
 const sun = new THREE.DirectionalLight(0xFFD8A8, 1.6);
 sun.position.set(8, 14, 18);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(1024, 1024);  // perf: 2048→1024 sun shadow
 sun.shadow.camera.left = -16; sun.shadow.camera.right = 16;
 sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
 sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 50;
@@ -1543,9 +1540,11 @@ VOLETS.forEach((v, i) => {
   PINS.push({ div, anchor });
 });
 
-// Update positions des pins HTML à chaque frame (projection 3D → écran)
+// Update positions des pins HTML — throttled every 3 frames for perf
 const _pinProj = new THREE.Vector3();
+let _pinFrame = 0;
 function updatePins() {
+  if (++_pinFrame % 3 !== 0) return;  // perf: skip 2 out of 3 frames
   for (const pin of PINS) {
     _pinProj.copy(pin.anchor).project(camera);
     const inFront = _pinProj.z > -1 && _pinProj.z < 1;
