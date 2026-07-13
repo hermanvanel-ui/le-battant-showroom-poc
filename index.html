@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Le battant — showroom 3D des 8 volets (v0.12)</title>
-<meta name="description" content="Showroom 3D Le battant v0.12 : bâtiment industriel + entrée volet battant qui s'ouvre + showroom premium (sol carrelage beige, plafond noir nervuré, colonnes IPN aux coins) + V0 Battant à gond en condition de pose réelle (mur + ouverture + volet alu thermolaqué + image Gemini ref à côté). Pins HTML 3D-ancrés, scroll fluide avec smoothstep easing.">
+<link rel="icon" href="data:,">
+<title>Le battant — showroom 3D des 8 volets (v0.33)</title>
+<meta name="description" content="Showroom 3D Le battant v0.33 : bâtiment industriel, entrée-volet animée et 8 volets aluminium présentés dans leurs vraies conditions de pose. Navigation caméra fluide et synchronisée au scroll sur mobile et desktop.">
 <style>
   :root {
     --noir:#08080c; --noir-2:#14141A; --creme:#F5F0E1;
@@ -134,6 +135,8 @@
     .volet-pin {
       width:calc(100vw - 40px); max-width:300px;
       padding:12px 16px; border-left-width:3px;
+      background:rgba(8,8,12,0.96);
+      backdrop-filter:none; -webkit-backdrop-filter:none;
     }
     .pin-kicker { font-size:10px; letter-spacing:0.25em; margin-bottom:6px; }
     .pin-title { font-size:20px; margin-bottom:8px; }
@@ -347,13 +350,9 @@
 <script type="module">
 import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-// import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';  // perf: removed
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isTouchMobile = matchMedia('(max-width: 760px), (pointer: coarse)').matches;
 
 // =========================================================
 // PBR LIBRARY HELPERS — préchargement via THREE.LoadingManager
@@ -428,11 +427,14 @@ scene.fog = new THREE.FogExp2(0x9E9070, 0.012);
 function computeFOV() { return (innerHeight > innerWidth) ? 75 : 46; }
 const camera = new THREE.PerspectiveCamera(computeFOV(), innerWidth/innerHeight, 0.1, 300);
 
-const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:'high-performance' }); // antialias off — composer handles it
+const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:'high-performance' });
 // Fallback à 1280x720 si la page démarre avec un viewport 0x0 (tab cachée au boot via Preview MCP/headless)
-const _initW = Math.max(innerWidth, 1280), _initH = Math.max(innerHeight, 720);
+// Ne pas utiliser Math.max : sur un mobile 375 px, cela créait un buffer
+// 1280 px puis appliquait le DPR — plus de 5x les pixels nécessaires.
+const _initW = innerWidth > 0 ? innerWidth : 1280;
+const _initH = innerHeight > 0 ? innerHeight : 720;
 renderer.setSize(_initW, _initH);
-renderer.setPixelRatio(Math.min(1.5, devicePixelRatio)); // perf: cap DPR (2→1.5) — saves ~44% fill rate on Retina
+renderer.setPixelRatio(isTouchMobile ? 1 : Math.min(1.5, devicePixelRatio));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -440,26 +442,46 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.9;  // M2 : léger lift premium (0.85→0.9) — alu mat, plus de risque LED ; textes HTML ont leur propre fond sombre
 wrap.appendChild(renderer.domElement);
 
-const renderPass = new RenderPass(scene, camera);
-// SSAO subtil pour donner du contact aux objets (recoins, joints, intersections)
-// SSAO disabled for performance — nearly invisible at kernelRadius 0.32 but costs 5-15ms/frame
-// const ssaoPass = new SSAOPass(scene, camera, innerWidth, innerHeight);
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(Math.floor(innerWidth/2), Math.floor(innerHeight/2)), 0.11, 0.5, 0.92); // half-res bloom
-const outputPass = new OutputPass();
-const composer = new EffectComposer(renderer);
-composer.addPass(renderPass);
-// composer.addPass(ssaoPass);  // perf: removed
-composer.addPass(bloomPass);
-composer.addPass(outputPass);
+// Rendu direct. Le bloom historique (0.11) était presque imperceptible mais
+// ajoutait deux render targets et un second passage plein écran à chaque frame.
+const composer = null;
 
-addEventListener('resize', () => {
-  camera.fov = computeFOV();  // recompute FOV en cas de rotation portrait↔landscape
-  camera.aspect = innerWidth/innerHeight;
+let renderWidth = _initW;
+let renderHeight = _initH;
+let resizeQueued = false;
+let appliedResizeCount = 0;
+let skippedMobileHeightResizeCount = 0;
+
+function applyStableResize() {
+  resizeQueued = false;
+  const width = Math.max(1, innerWidth);
+  const height = Math.max(1, innerHeight);
+  const widthChanged = width !== renderWidth;
+  const orientationChanged = (width > height) !== (renderWidth > renderHeight);
+
+  // La barre d'adresse mobile modifie innerHeight pendant le scroll. Réallouer
+  // les buffers WebGL à chaque variation bloquait la boucle de rendu.
+  if (isTouchMobile && !widthChanged && !orientationChanged) {
+    skippedMobileHeightResizeCount++;
+    return;
+  }
+
+  renderWidth = width;
+  renderHeight = height;
+  camera.fov = computeFOV();
+  camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-  composer.setSize(innerWidth, innerHeight);
-  // ssaoPass.setSize(innerWidth, innerHeight);  // SSAO disabled
-});
+  renderer.setSize(width, height, false);
+  appliedResizeCount++;
+}
+
+function queueStableResize() {
+  if (resizeQueued) return;
+  resizeQueued = true;
+  requestAnimationFrame(applyStableResize);
+}
+addEventListener('resize', queueStableResize, { passive:true });
+addEventListener('orientationchange', queueStableResize, { passive:true });
 
 // =========================================================
 // HDRI (industrial sunset — sera utilisé partout, suffisant)
@@ -530,10 +552,12 @@ const MAT = {
   // Plafond bac acier noir nervuré
   ceiling: new THREE.MeshPhysicalMaterial({ color: 0x0E0E12, metalness: 0.55, roughness: 0.7 }),
   // Verre cloisons vitrées (showroom — chaque volet dans un mini-box vitré)
+  // Verre transparent sans transmission physique : la transmission force une
+  // passe complète supplémentaire de la scène pour un gain visuel minime ici.
   glass: new THREE.MeshPhysicalMaterial({
-    color: 0xFFFFFF, metalness: 0.0, roughness: 0.05,
-    transmission: 0.92, ior: 1.45, thickness: 0.02,
-    clearcoat: 1.0, transparent: true, opacity: 0.18, side: THREE.DoubleSide
+    color: 0xDDE8E8, metalness: 0.08, roughness: 0.12,
+    clearcoat: 0.8, transparent: true, opacity: 0.15,
+    depthWrite: false, side: THREE.DoubleSide
   }),
   // Pas de pedestal bois — remplacé par socle béton noir
   pedestal: new THREE.MeshPhysicalMaterial({ color: 0x1B1B22, metalness: 0.2, roughness: 0.6, clearcoat: 0.3 }),
@@ -699,6 +723,38 @@ COL_POSITIONS.forEach(([x, z]) => {
   scene.add(col);
 });
 
+// ──── CLOISONS VITRÉES : 4 baies produit par mur ────
+// Elles découpent le showroom sans fermer les vues ni couper le parcours caméra.
+function makeGlassDivider() {
+  const g = new THREE.Group();
+  const width = 1.3, height = 2.75, frame = 0.045;
+  const pane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), MAT.glass);
+  pane.position.y = height / 2;
+  g.add(pane);
+
+  for (const x of [-width/2, width/2]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(frame, height + 0.1, frame), MAT.steelBlack);
+    post.position.set(x, height / 2, 0);
+    g.add(post);
+  }
+  for (const y of [0.03, height]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(width + frame, frame, frame), MAT.steelBlack);
+    rail.position.set(0, y, 0);
+    g.add(rail);
+  }
+  g.rotation.y = Math.PI / 2;
+  return g;
+}
+
+for (const x of [-4.7, 0, 4.7]) {
+  const northDivider = makeGlassDivider();
+  northDivider.position.set(x, 0, -SR.halfL + 0.72);
+  scene.add(northDivider);
+  const southDivider = makeGlassDivider();
+  southDivider.position.set(x, 0, SR.halfL - 0.72);
+  scene.add(southDivider);
+}
+
 // =========================================================
 // FAÇADE EXTÉRIEURE — bâtiment industriel Le battant
 // Style Monsieur Store : bardage anthracite vertical + enseigne caisson noir
@@ -813,6 +869,50 @@ const parking = new THREE.Mesh(new THREE.BoxGeometry(40, 0.1, 18), MAT.asphalt);
 parking.position.set(0, -0.07, SR.halfL + 9);
 parking.receiveShadow = true; fixAO(parking);
 scene.add(parking);
+
+// Marquage discret des places, puis véhicules low-poly hors de l'axe d'entrée.
+const parkingLineMat = new THREE.MeshStandardMaterial({ color:0xD8D3C8, roughness:0.85 });
+for (const x of [-10, -7.5, -5, 5, 7.5, 10]) {
+  const line = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.012, 5.2), parkingLineMat);
+  line.position.set(x, 0.002, SR.halfL + 8.7);
+  scene.add(line);
+}
+
+function makeParkedCar(color) {
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color, metalness:0.45, roughness:0.42 });
+  const windowMat = new THREE.MeshStandardMaterial({ color:0x17242A, metalness:0.2, roughness:0.2 });
+  const tireMat = new THREE.MeshStandardMaterial({ color:0x111115, roughness:0.95 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.35, 0.52, 1.55), bodyMat);
+  body.position.y = 0.52;
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.55, 1.38), windowMat);
+  cabin.position.set(0.22, 1.0, 0);
+  g.add(body, cabin);
+  for (const x of [-1.05, 1.05]) {
+    for (const z of [-0.74, 0.74]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.18, 12), tireMat);
+      wheel.rotation.x = Math.PI / 2;
+      wheel.position.set(x, 0.3, z);
+      g.add(wheel);
+    }
+  }
+  g.traverse(o => {
+    if (!o.isMesh) return;
+    o.castShadow = !isTouchMobile;
+    o.receiveShadow = true;
+  });
+  return g;
+}
+
+[
+  { x:-7.4, z:SR.halfL + 9.0, color:0x38444B, rot:0.03 },
+  { x: 7.4, z:SR.halfL + 10.2, color:0x8A8D86, rot:-0.04 },
+].forEach(({ x, z, color, rot }) => {
+  const car = makeParkedCar(color);
+  car.position.set(x, 0, z);
+  car.rotation.y = rot;
+  scene.add(car);
+});
 
 // ──── 2 BORDURES BÉTON CLAIR au pied de la façade ────
 const curbMat = new THREE.MeshStandardMaterial({ color: 0xB0B0AC, roughness: 0.9 });
@@ -1748,20 +1848,24 @@ function getCameraAt(scrollT) {
 // SCROLL + LENIS
 // =========================================================
 let scrollT = 0, targetT = 0;
-function updateScrollT() {
+function updateScrollFromNative() {
   const max = document.documentElement.scrollHeight - innerHeight;
   targetT = Math.max(0, Math.min(1, scrollY / Math.max(1, max)));
 }
-const lenis = (typeof Lenis === 'function' && !prefersReduced)
-  ? new Lenis({ duration: 1.6, easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)), smoothWheel: true, smoothTouch: false })
+// Lenis n'apportait aucun lissage tactile (smoothTouch:false) mais gardait une
+// seconde boucle RAF active. Sur mobile on suit donc le scroll natif, sans proxy.
+const lenis = (typeof Lenis === 'function' && !prefersReduced && !isTouchMobile)
+  ? new Lenis({ duration: 1.05, easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)), smoothWheel: true, autoRaf: false })
   : null;
 if (lenis) {
-  lenis.on('scroll', updateScrollT);
-  (function raf(t) { lenis.raf(t); requestAnimationFrame(raf); })();
+  lenis.on('scroll', ({ scroll, limit }) => {
+    targetT = Math.max(0, Math.min(1, scroll / Math.max(1, limit)));
+  });
 } else {
-  addEventListener('scroll', updateScrollT, { passive:true });
+  addEventListener('scroll', updateScrollFromNative, { passive:true });
 }
-updateScrollT();
+updateScrollFromNative();
+scrollT = targetT;
 
 // HUD
 const dots = [...document.querySelectorAll('#progress .dot')];
@@ -1777,7 +1881,10 @@ function updateHUD() {
 dots.forEach((d, i) => {
   d.style.pointerEvents = 'auto'; d.style.cursor = 'pointer';
   d.addEventListener('click', () => {
-    document.querySelectorAll('main > section')[i]?.scrollIntoView({ behavior:'smooth', block:'start' });
+    const section = document.querySelectorAll('main > section')[i];
+    if (!section) return;
+    if (lenis) lenis.scrollTo(section, { duration:0.9 });
+    else section.scrollIntoView({ behavior:'smooth', block:'start' });
   });
 });
 
@@ -1788,10 +1895,15 @@ const clock = new THREE.Clock();
 const lookV = new THREE.Vector3();
 function easeInOutCubic(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
 
-function loop() {
-  const dt = clock.getDelta();
+function loop(now) {
+  // Horloge unique : Lenis met à jour sa position, puis la caméra lit cette
+  // même position et Three.js rend la frame. Aucun RAF concurrent.
+  if (lenis) lenis.raf(now);
+  const dt = Math.min(clock.getDelta(), 0.1);
 
-  scrollT += (targetT - scrollT) * 0.045;
+  // targetT est déjà lissé par Lenis sur desktop et par l'inertie native sur
+  // tactile. L'ancien facteur 0.045/frame ajoutait un retard dépendant du FPS.
+  scrollT = targetT;
   const t = Math.max(0, Math.min(1, scrollT));
 
   // Volet porte d'entrée — ouvre tôt (scrollT 0 → 0.05) pour être full open avant que la caméra passe
@@ -1816,11 +1928,32 @@ function loop() {
   updatePins();
 
   updateHUD();
-  composer.render();
+  renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
-// Démarre la loop tout de suite (le rendu commence, le loader masque la scène)
-loop();
+// Démarre sur un timestamp RAF valide (également utilisé par Lenis).
+requestAnimationFrame(loop);
+
+// État lisible par les tests automatisés, sans exposer les objets de scène.
+window.__showroomDebug = {
+  getState() {
+    const buffer = renderer.getDrawingBufferSize(new THREE.Vector2());
+    return {
+      version: '0.33',
+      isTouchMobile,
+      lenisActive: Boolean(lenis),
+      rafOwner: 'scene-loop',
+      scrollT,
+      targetT,
+      scrollLag: Math.abs(targetT - scrollT),
+      renderSize: [renderWidth, renderHeight],
+      drawingBuffer: [buffer.x, buffer.y],
+      composerActive: Boolean(composer),
+      appliedResizeCount,
+      skippedMobileHeightResizeCount,
+    };
+  }
+};
 
 // Cache le loader UNIQUEMENT quand toutes les ressources (textures + HDRI) sont chargées
 ALL_LOADED.then(() => {

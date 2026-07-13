@@ -1,6 +1,14 @@
 # Le battant — showroom 3D des 8 volets
 
-POC du concept Herman 2026-05-31 : page `/gammes` V2 transformée en **showroom 3D immersif**. Hero (volets s'ouvrent au scroll) → caméra entre dans la pièce → 8 volets disposés sur piédestaux → caméra fait le tour, specs apparaissent à chaque arrêt.
+POC du concept Herman 2026-05-31 : page `/gammes` V2 transformée en **showroom 3D immersif**. Bâtiment industriel « Le battant » → entrée par un volet battant qui s'ouvre → showroom premium → 8 volets dans leurs conditions de pose → specs à chaque arrêt caméra.
+
+## Version actuelle — v0.33
+
+- Scroll mobile synchronisé : une seule boucle RAF, Lenis réservé au desktop et caméra calée sur la position native tactile.
+- Buffer WebGL mobile à la vraie taille du viewport (DPR 1) ; plus de faux fallback 1280 px.
+- Redimensionnement stabilisé contre les variations de barre d'adresse mobile.
+- Parcours complet : façade métallique + enseigne, parking vivant, porte-volet, plafond bac acier noir, sol grès beige, cloisons vitrées et 8 poses réelles.
+- Rendu direct ACES sur mobile et desktop ; ancien bloom 0.11 retiré car coûteux et quasi invisible.
 
 ## Live
 
@@ -21,8 +29,8 @@ POC du concept Herman 2026-05-31 : page `/gammes` V2 transformée en **showroom 
 
 ## Stack
 
-- **Three.js** 0.166 + Lenis 1.1.13 smooth scroll
-- **EffectComposer + UnrealBloomPass** (post-process)
+- **Three.js** 0.166 + Lenis 1.1.13 (desktop uniquement ; scroll natif tactile sur mobile)
+- **Rendu direct ACES Filmic** (sans post-process plein écran)
 - **HDRI Polyhaven** : `industrial_sunset_02` (atelier dramatique)
 - **Textures PBR Polyhaven** : `concrete_floor_02` (sol), `painted_plaster_wall` (murs), `worn_planks` (piédestaux), `metal_plate_02` (réserve métal)
 - **MeshPhysicalMaterial** : 4 variantes alu (vert-volet, crème, noir, rouge)
@@ -38,7 +46,7 @@ Cf. brain Herman → `Idées d'évolution du système.md` § *Showroom 3D Le bat
 ## TODO
 
 - [ ] Vraie texture alu brossé via Polyhaven (au lieu des MeshPhysical color-only)
-- [ ] Mini-animation d'ouverture par volet quand la caméra arrive
+- [x] Animation d'ouverture à la demande sur chaque volet compatible
 - [ ] Sons subtils (cliquetis paumelles, glissement coulissant)
 - [ ] Intégration dans la V2 Le battant `/gammes`
 - [ ] Variantes 2k textures pour desktop
