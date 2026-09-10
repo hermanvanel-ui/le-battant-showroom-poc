@@ -599,6 +599,19 @@ const MAT = {
   }),
 };
 
+// ──── Sol : texture photoréaliste Higgsfield (béton ciré) — override de l'albédo ────
+// Le showroom a déjà des textures (3d-pbr-library) ; on remplace juste le sol,
+// la plus grande surface visible, par un béton ciré premium généré via Higgsfield.
+new THREE.TextureLoader().load('floor.jpg', (t) => {
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(6, 4);                 // carreaux ~3,3 m sur un sol 20×14 m
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  MAT.floor.map = t;
+  MAT.floor.color.setHex(0xFFFFFF);   // laisse la vraie couleur de la texture
+  MAT.floor.needsUpdate = true;
+});
+
 function castAll(g) { g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }}); return g; }
 function fixAO(mesh) {
   if (mesh.geometry && mesh.geometry.attributes.uv && !mesh.geometry.attributes.uv2) {
