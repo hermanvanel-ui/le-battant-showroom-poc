@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>Le battant — showroom 3D des 8 volets (v0.33)</title>
-<meta name="description" content="Showroom 3D Le battant v0.33 : bâtiment industriel, entrée-volet animée et 8 volets aluminium présentés dans leurs vraies conditions de pose. Navigation caméra fluide et synchronisée au scroll sur mobile et desktop.">
+<title>Le battant — showroom 3D des 8 volets (v0.34)</title>
+<meta name="description" content="Showroom 3D Le battant v0.34 : textures Higgsfield photoréalistes (alu brossé, enduit, bardage, pierre calcaire). Bâtiment industriel, entrée-volet animée et 8 volets aluminium présentés dans leurs vraies conditions de pose.">
 <style>
   :root {
     --noir:#08080c; --noir-2:#14141A; --creme:#F5F0E1;
@@ -511,8 +511,7 @@ const asphaltTexSet = loadTextureSet('asphalt_03', { res:'1k', repeat:[6, 4] });
 // Façade bardage métallique nervuré (anthracite — comme Monsieur Store)
 // `corrugated_iron_03` Polyhaven existe (rusted) — on tint en anthracite via le color du material
 const claddingTexSet = loadTextureSet('corrugated_iron_03', { res:'1k', repeat:[3, 1.8] });  // perf: 2k→1k facade cladding
-// Texture alu spécifique pour les volets (painted_metal_shutter = alu thermolaqué)
-const aluShutterTex = loadTextureSet('painted_metal_shutter', { res:'1k', repeat:[1, 2] });
+// Texture alu Polyhaven retirée — remplacée par Higgsfield (tex-alu.jpg)
 
 // =========================================================
 // MATÉRIAUX
@@ -597,6 +596,10 @@ const MAT = {
     color: 0x14141A, metalness: 0.9, roughness: 0.22,
     clearcoat: 0.7, envMapIntensity: 1.7
   }),
+  // Pierre encadrement fenêtres (calcaire beige chaud) — Higgsfield override
+  stone: new THREE.MeshPhysicalMaterial({
+    color: 0xD8C8A8, roughness: 1.0, metalness: 0.0, envMapIntensity: 0.4
+  }),
 };
 
 // ──── Sol : texture photoréaliste Higgsfield (béton ciré) — override de l'albédo ────
@@ -610,6 +613,51 @@ new THREE.TextureLoader().load('floor.jpg', (t) => {
   MAT.floor.map = t;
   MAT.floor.color.setHex(0xFFFFFF);   // laisse la vraie couleur de la texture
   MAT.floor.needsUpdate = true;
+});
+
+// ──── Murs intérieurs : texture Higgsfield (enduit crème taloché) ────
+new THREE.TextureLoader().load('tex-wall.jpg', (t) => {
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 1.5);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  MAT.wall.map = t;
+  MAT.wall.color.setHex(0xFFFFFF);
+  MAT.wall.needsUpdate = true;
+});
+
+// ──── Bardage façade : texture Higgsfield (tôle nervurée anthracite) ────
+new THREE.TextureLoader().load('tex-bardage.jpg', (t) => {
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 1.8);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  MAT.cladding.map = t;
+  MAT.cladding.color.setHex(0xFFFFFF);
+  MAT.cladding.needsUpdate = true;
+});
+
+// ──── Alu volets : texture Higgsfield (brossé neutre, teinté par la couleur du matériau) ────
+new THREE.TextureLoader().load('tex-alu.jpg', (t) => {
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1, 2);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  [MAT.aluVert, MAT.aluCreme, MAT.aluRouge, MAT.aluNoir].forEach(m => {
+    m.map = t;
+    m.needsUpdate = true;
+  });
+});
+
+// ──── Pierre encadrements : texture Higgsfield (calcaire beige) ────
+new THREE.TextureLoader().load('tex-stone.jpg', (t) => {
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1.5, 1.5);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  MAT.stone.map = t;
+  MAT.stone.color.setHex(0xFFFFFF);
+  MAT.stone.needsUpdate = true;
 });
 
 function castAll(g) { g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }}); return g; }
@@ -1394,13 +1442,8 @@ function makeVoletEnPose(aluMat, imageUrl, factory, opts = {}) {
   const WIN_W = 1.35, WIN_H = 1.9;  // ouverture élargie pour contenir les volets (v0.21, retour Herman "ça déborde")
   const winCenterY = WF_H/2 - 0.05;
 
-  const stoneWallMat = new THREE.MeshPhysicalMaterial({
-    map: plasterTexSet.diff, normalMap: plasterTexSet.nor_gl, aoMap: plasterTexSet.ao,
-    color: 0xA89E8C, roughness: 1.0, metalness: 0.0
-  });
-
   function placeWallPiece(w, h, x, y) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, WF_D), stoneWallMat);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, WF_D), MAT.stone);
     m.position.set(x, y, 0);
     fixAO(m);
     m.castShadow = true; m.receiveShadow = true;
